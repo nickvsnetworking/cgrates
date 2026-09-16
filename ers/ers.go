@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package ers
 
@@ -61,7 +46,7 @@ func NewERService(cfg *config.CGRConfig, datadb *engine.DataManager, filterS *en
 		filterS:          filterS,
 		connMgr:          connMgr,
 	}
-	ers.partialCache = ltcache.NewCache(ltcache.UnlimitedCaching, cfg.ERsCfg().PartialCacheTTL, false, false, []func(itmID string, value any){ers.onEvicted})
+	ers.partialCache = ltcache.NewCache(ltcache.UnlimitedCaching, cfg.ERsCfg().PartialCacheTTL, false, false, []func(itmID string, value any){ers.onEvicted}, nil)
 	return
 }
 
@@ -155,23 +140,43 @@ func (erS *ERService) ListenAndServe(stopChan, cfgRldChan chan struct{}) error {
 				}
 				if err = erS.exportRawEvent(erEv, err != nil); err != nil {
 					utils.Logger.Warning(
-						fmt.Sprintf("<%s> exporting event: <%s> from reader: <%s> got error: <%v>",
+						fmt.Sprintf("<%s> exporting raw event: <%s> from reader: <%s> got error: <%v>",
 							utils.ERs, utils.ToJSON(erEv.cgrEvent), erEv.rdrCfg.ID, err))
 				}
 				<-erS.concurrentEvents
 			}()
 		case pEv := <-erS.partialEvents:
-			err := erS.processPartialEvent(pEv.cgrEvent, pEv.rdrCfg)
+			completeCgrEv, err := erS.processPartialEvent(pEv.cgrEvent, pEv.rdrCfg)
 			if err != nil {
 				utils.Logger.Warning(
 					fmt.Sprintf("<%s> reading partial event: <%s> from reader: <%s> got error: <%v>",
 						utils.ERs, utils.ToJSON(pEv.cgrEvent), pEv.rdrCfg.ID, err))
 			}
-			if err = erS.exportRawEvent(pEv, err != nil); err != nil {
-				utils.Logger.Warning(
-					fmt.Sprintf("<%s> exporting partial event: <%s> from reader: <%s> got error: <%v>",
-						utils.ERs, utils.ToJSON(pEv.cgrEvent), pEv.rdrCfg.ID, err))
+			if completeCgrEv == nil {
+				// export raw event even if it is partial, in case its asked for
+				if err = erS.exportRawEvent(pEv, err != nil); err != nil {
+					utils.Logger.Warning(
+						fmt.Sprintf("<%s> exporting partial raw event: <%s> from reader: <%s> got error: <%v>",
+							utils.ERs, utils.ToJSON(pEv.cgrEvent), pEv.rdrCfg.ID, err))
+				}
+				continue
 			}
+			// if event is complete, process it immediately instead of sending it back to erS.rdrEvents to not block both channels and avoid needless goroutine
+			erS.concurrentEvents <- struct{}{}
+			go func() {
+				err := erS.processEvent(completeCgrEv, pEv.rdrCfg)
+				if err != nil {
+					utils.Logger.Warning(
+						fmt.Sprintf("<%s> reading event: <%s> from reader: <%s> got error: <%v>",
+							utils.ERs, utils.ToJSON(completeCgrEv), pEv.rdrCfg.ID, err))
+				}
+				if err = erS.exportRawEvent(&erEvent{cgrEvent: completeCgrEv, rawEvent: pEv.rawEvent, rdrCfg: pEv.rdrCfg}, err != nil); err != nil {
+					utils.Logger.Warning(
+						fmt.Sprintf("<%s> exporting raw event: <%s> from reader: <%s> got error: <%v>",
+							utils.ERs, utils.ToJSON(completeCgrEv), pEv.rdrCfg.ID, err))
+				}
+				<-erS.concurrentEvents
+			}()
 		case <-cfgRldChan: // handle reload
 			cfgIDs := make(map[string]int)
 			pathReloaded := make(utils.StringSet)
@@ -294,7 +299,7 @@ func (erS *ERService) processEvent(cgrEv *utils.CGREvent,
 		utils.MetaDryRun, utils.MetaAuthorize,
 		utils.MetaInitiate, utils.MetaUpdate,
 		utils.MetaTerminate, utils.MetaMessage,
-		utils.MetaCDRs, utils.MetaEvent, utils.MetaNone, utils.MetaExport} {
+		utils.MetaCDRs, utils.MetaEvent, utils.MetaNone} {
 		if rdrCfg.Flags.Has(typ) { // request type is identified through flags
 			reqType = typ
 			break
@@ -442,7 +447,6 @@ func (erS *ERService) processEvent(cgrEv *utils.CGREvent,
 			replyState = utils.ErrReplyStateEvent
 		}
 	case utils.MetaCDRs: // allow CDR processing
-	case utils.MetaExport: // allow event exporting
 	}
 	if err != nil {
 		return
@@ -454,18 +458,6 @@ func (erS *ERService) processEvent(cgrEv *utils.CGREvent,
 		if err := erS.connMgr.Call(context.TODO(), erS.cfg.ERsCfg().SessionSConns,
 			utils.SessionSv1ProcessCDR, cgrEv, rplyCDRs); err != nil {
 			replyState = utils.ErrReplyStateCDRs
-			return err
-		}
-	}
-	if rdrCfg.Flags.Has(utils.MetaExport) {
-		var reply map[string]map[string]any
-		if err := erS.connMgr.Call(context.TODO(), erS.cfg.ERsCfg().EEsConns,
-			utils.EeSv1ProcessEvent,
-			&engine.CGREventWithEeIDs{
-				EeIDs:    rdrCfg.EEsIDs,
-				CGREvent: cgrEv,
-			}, &reply); err != nil {
-			replyState = utils.ErrReplyStateExport
 			return err
 		}
 	}
@@ -484,7 +476,7 @@ type erEvents struct {
 }
 
 // processPartialEvent process the event as a partial event
-func (erS *ERService) processPartialEvent(ev *utils.CGREvent, rdrCfg *config.EventReaderCfg) (err error) {
+func (erS *ERService) processPartialEvent(ev *utils.CGREvent, rdrCfg *config.EventReaderCfg) (cgrEv *utils.CGREvent, err error) {
 	// to identify the event the originID and originHost is used to create the CGRID
 	orgID, err := ev.FieldAsString(utils.OriginID)
 	if err == utils.ErrNotFound { // the field is missing ignore the event
@@ -509,16 +501,17 @@ func (erS *ERService) processPartialEvent(ev *utils.CGREvent, rdrCfg *config.Eve
 		cgrEvs.rdrCfg = rdrCfg
 	}
 
-	var cgrEv *utils.CGREvent
 	if cgrEv, err = mergePartialEvents(cgrEvs.events, cgrEvs.rdrCfg, erS.filterS, // merge the events
 		erS.cfg.GeneralCfg().DefaultTenant,
 		erS.cfg.GeneralCfg().DefaultTimezone,
 		erS.cfg.GeneralCfg().RSRSep); err != nil {
+		cgrEv = nil
 		return
 	}
 	if partial := cgrEv.APIOpts[utils.PartialOpt]; !slices.Contains([]string{utils.FalseStr, utils.EmptyString},
 		utils.IfaceAsString(partial)) { // if is still partial set it back in cache
 		erS.partialCache.Set(cgrID, cgrEvs, nil)
+		cgrEv = nil
 		return
 	}
 
@@ -527,7 +520,6 @@ func (erS *ERService) processPartialEvent(ev *utils.CGREvent, rdrCfg *config.Eve
 		erS.partialCache.Set(cgrID, nil, nil) // set it with nil in cache to ignore when we expire the item
 		erS.partialCache.Remove(cgrID)
 	}
-	go func() { erS.rdrEvents <- &erEvent{cgrEvent: cgrEv, rdrCfg: rdrCfg} }() // put the event on the complete events chanel( in a goroutine to not block the select from ListenAndServe)
 	return
 }
 
@@ -665,7 +657,7 @@ func (erS *ERService) onEvicted(id string, value any) {
 			for el := eeReq.ExpData[utils.MetaExp].GetFirstElement(); el != nil; el = el.Next() {
 				path := el.Value
 				nmIt, _ := eeReq.ExpData[utils.MetaExp].Field(path)
-				path = path[:len(path)-1] // remove the last index
+				path = utils.StripTrailingIndex(path)
 				record[strings.Join(path, utils.NestingSep)] = nmIt.Data
 			}
 		} else {

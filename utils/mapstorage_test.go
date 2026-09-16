@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package utils
 
 import (
@@ -1024,4 +1010,88 @@ func TestNewSecureMapStorage(t *testing.T) {
 	if sm := NewSecureMapStorage(); reflect.DeepEqual(sm, nil) {
 		t.Error("should receive new secure map")
 	}
+}
+
+func TestMapStorageAppend(t *testing.T) {
+	t.Run("empty path", func(t *testing.T) {
+		ms := MapStorage{}
+		if err := ms.Append(nil, "val"); err != ErrWrongPath {
+			t.Errorf("expected ErrWrongPath, got %v", err)
+		}
+	})
+
+	t.Run("missing key", func(t *testing.T) {
+		ms := MapStorage{}
+		if err := ms.Append([]string{"key"}, "val1"); err != nil {
+			t.Fatal(err)
+		}
+		exp := []any{"val1"}
+		if got := ms["key"]; !reflect.DeepEqual(exp, got) {
+			t.Errorf("expected %v, got %v", exp, got)
+		}
+	})
+
+	t.Run("append twice", func(t *testing.T) {
+		ms := MapStorage{}
+		if err := ms.Append([]string{"key"}, "val1"); err != nil {
+			t.Fatal(err)
+		}
+		if err := ms.Append([]string{"key"}, "val2"); err != nil {
+			t.Fatal(err)
+		}
+		exp := []any{"val1", "val2"}
+		if got := ms["key"]; !reflect.DeepEqual(exp, got) {
+			t.Errorf("expected %v, got %v", exp, got)
+		}
+	})
+
+	t.Run("promote scalar", func(t *testing.T) {
+		ms := MapStorage{"key": "existing"}
+		if err := ms.Append([]string{"key"}, "new"); err != nil {
+			t.Fatal(err)
+		}
+		exp := []any{"existing", "new"}
+		if got := ms["key"]; !reflect.DeepEqual(exp, got) {
+			t.Errorf("expected %v, got %v", exp, got)
+		}
+	})
+
+	t.Run("nested path", func(t *testing.T) {
+		ms := MapStorage{}
+		if err := ms.Append([]string{"a", "b"}, "val1"); err != nil {
+			t.Fatal(err)
+		}
+		if err := ms.Append([]string{"a", "b"}, "val2"); err != nil {
+			t.Fatal(err)
+		}
+		inner, ok := ms["a"].(MapStorage)
+		if !ok {
+			t.Fatalf("expected MapStorage at key 'a', got %T", ms["a"])
+		}
+		exp := []any{"val1", "val2"}
+		if got := inner["b"]; !reflect.DeepEqual(exp, got) {
+			t.Errorf("expected %v, got %v", exp, got)
+		}
+	})
+
+	t.Run("nested into map[string]any", func(t *testing.T) {
+		ms := MapStorage{
+			"a": map[string]any{"existing": "data"},
+		}
+		if err := ms.Append([]string{"a", "key"}, "val1"); err != nil {
+			t.Fatal(err)
+		}
+		inner := ms["a"].(map[string]any)
+		exp := []any{"val1"}
+		if got := inner["key"]; !reflect.DeepEqual(exp, got) {
+			t.Errorf("expected %v, got %v", exp, got)
+		}
+	})
+
+	t.Run("wrong path type", func(t *testing.T) {
+		ms := MapStorage{"a": 42}
+		if err := ms.Append([]string{"a", "b"}, "val"); err != ErrWrongPath {
+			t.Errorf("expected ErrWrongPath, got %v", err)
+		}
+	})
 }

@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package config
 
 import (
@@ -596,5 +582,56 @@ func TestHTTPAgentCfgsClone(t *testing.T) {
 	}
 	if rcv[0].RequestProcessors[0].ID = ""; ban[0].RequestProcessors[0].ID != "OutboundAUTHDryRun" {
 		t.Errorf("Expected clone to not modify the cloned")
+	}
+}
+
+func TestHTTPAgentCfgClone(t *testing.T) {
+	tests := []struct {
+		name         string
+		httpAgentCfg *HTTPAgentCfg
+	}{
+		{
+			name: "Complete HTTPAgentCfg",
+			httpAgentCfg: &HTTPAgentCfg{
+				ID:              "conecto1",
+				URL:             "/conecto",
+				SessionSConns:   []string{utils.MetaInternal, "*conn1"},
+				StatSConns:      []string{utils.MetaInternal, "*conn1"},
+				ThresholdSConns: []string{utils.MetaInternal, "*conn1"},
+				RequestPayload:  "*url",
+				ReplyPayload:    "*xml",
+				RequestProcessors: []*RequestProcessor{{
+					ID:            "OutboundAUTHDryRun",
+					Filters:       []string{"*string:*req.request_type:OutboundAUTH", "*string:*req.Msisdn:497700056231"},
+					Tenant:        NewRSRParsersMustCompile("cgrates.org", utils.InfieldSep),
+					Flags:         utils.FlagsWithParams{"*dryrun": {}},
+					RequestFields: []*FCTemplate{},
+					ReplyFields: []*FCTemplate{{
+						Tag:       "Allow",
+						Path:      "response.Allow",
+						Type:      "*constant",
+						Value:     NewRSRParsersMustCompile("1", utils.InfieldSep),
+						Mandatory: true,
+					}},
+				}},
+			},
+		},
+		{
+			name:         "Nil Case",
+			httpAgentCfg: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.httpAgentCfg.Clone()
+
+			if !reflect.DeepEqual(result, tt.httpAgentCfg) {
+				t.Errorf("Clone() = %#+v, want %#+v", result, tt.httpAgentCfg)
+			}
+
+			if result != nil && result == tt.httpAgentCfg {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
 	}
 }

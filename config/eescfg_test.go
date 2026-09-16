@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package config
 
@@ -52,6 +37,21 @@ func TestEESClone(t *testing.T) {
 			"elsRouting":"test4",
 			"elsTimeout":"1m",
 			"elsWaitForActiveShards":"test6",
+			"elsCAPath":"test",
+			"elsDiscoverNodesOnStart":true,
+			"elsDiscoverNodesInterval": "10s",
+			"elsAPIKey":"test",
+			"elsCertificateFingerprint":"test",
+			"elsServiceToken":"test",
+			"elsUsername":"test",
+			"elsPassword":"test",
+			"elsEnableDebugLogger":false,
+			"elsLogger":"test",
+			"elsCompressRequestBody":false,
+			"elsCompressRequestBodyLevel":1,
+			"elsMaxRetries":2,
+			"elsDisableRetry":false,
+			"elsRetryOnStatus":[1,2],
 			"sqlMaxIdleConns":4,
 			"sqlMaxOpenConns":6,
 			"sqlConnMaxLifetime":"1m",
@@ -307,13 +307,28 @@ func TestEESClone(t *testing.T) {
 						MaxOpenConns:        utils.IntPointer(6),
 					},
 					Els: &ElsOpts{
-						Index:               utils.StringPointer("test"),
-						Refresh:             utils.StringPointer("true"),
-						OpType:              utils.StringPointer("test2"),
-						Pipeline:            utils.StringPointer("test3"),
-						Routing:             utils.StringPointer("test4"),
-						Timeout:             utils.DurationPointer(1 * time.Minute),
-						WaitForActiveShards: utils.StringPointer("test6"),
+						Index:                    utils.StringPointer("test"),
+						Refresh:                  utils.StringPointer("true"),
+						OpType:                   utils.StringPointer("test2"),
+						Pipeline:                 utils.StringPointer("test3"),
+						Routing:                  utils.StringPointer("test4"),
+						Timeout:                  utils.DurationPointer(1 * time.Minute),
+						WaitForActiveShards:      utils.StringPointer("test6"),
+						CAPath:                   utils.StringPointer("test"),
+						DiscoverNodesOnStart:     utils.BoolPointer(true),
+						DiscoverNodeInterval:     utils.DurationPointer(10 * time.Second),
+						APIKey:                   utils.StringPointer("test"),
+						CertificateFingerprint:   utils.StringPointer("test"),
+						ServiceToken:             utils.StringPointer("test"),
+						Username:                 utils.StringPointer("test"),
+						Password:                 utils.StringPointer("test"),
+						EnableDebugLogger:        utils.BoolPointer(false),
+						Logger:                   utils.StringPointer("test"),
+						CompressRequestBody:      utils.BoolPointer(false),
+						CompressRequestBodyLevel: utils.IntPointer(1),
+						MaxRetries:               utils.IntPointer(2),
+						DisableRetry:             utils.BoolPointer(false),
+						RetryOnStatus:            &[]int{1, 2},
 					},
 					Kafka: &KafkaOpts{
 						Topic: utils.StringPointer("kafka"),
@@ -540,6 +555,26 @@ func TestEventExporterOptsloadFromJsonCfg(t *testing.T) {
 		RPCReplyTimeout: utils.StringPointer("test"),
 	}); err == nil {
 		t.Error(err)
+	} else if err := eventExporter.Opts.loadFromJSONCfg(&EventExporterOptsJson{
+		RPCReplyTimeout: utils.StringPointer("test"),
+	}); err == nil {
+		t.Error(err)
+	} else if err := eventExporter.Opts.loadFromJSONCfg(&EventExporterOptsJson{
+		KafkaLinger: utils.StringPointer("test"),
+	}); err == nil {
+		t.Error(err)
+	} else if err := eventExporter.Opts.loadFromJSONCfg(&EventExporterOptsJson{
+		KafkaDeliveryTimeout: utils.StringPointer("test"),
+	}); err == nil {
+		t.Error(err)
+	} else if err := eventExporter.Opts.loadFromJSONCfg(&EventExporterOptsJson{
+		ElsTimeout: utils.StringPointer("test"),
+	}); err == nil {
+		t.Error(err)
+	} else if err := eventExporter.Opts.loadFromJSONCfg(&EventExporterOptsJson{
+		SQLConnMaxLifetime: utils.StringPointer("test"),
+	}); err == nil {
+		t.Error(err)
 	}
 
 }
@@ -552,6 +587,20 @@ func TestEESCacheloadFromJsonCfg(t *testing.T) {
 			},
 		},
 	}
+	expected := "time: unknown unit \"ss\" in duration \"1ss\""
+	jsonCfg := NewDefaultCGRConfig()
+	if err := jsonCfg.eesCfg.loadFromJSONCfg(eesCfg, jsonCfg.templates, jsonCfg.generalCfg.RSRSep, jsonCfg.dfltEvExp); err == nil || err.Error() != expected {
+		t.Errorf("Expected %+v, received %+v", expected, err)
+	}
+}
+
+func TestEESCacheloadFromJsonCfgError(t *testing.T) {
+	eesCfg := &EEsJsonCfg{
+		FailedPosts: &FailedPostsJsonCfg{
+			TTL: utils.StringPointer("1ss"),
+		},
+	}
+
 	expected := "time: unknown unit \"ss\" in duration \"1ss\""
 	jsonCfg := NewDefaultCGRConfig()
 	if err := jsonCfg.eesCfg.loadFromJSONCfg(eesCfg, jsonCfg.templates, jsonCfg.generalCfg.RSRSep, jsonCfg.dfltEvExp); err == nil || err.Error() != expected {
@@ -1085,12 +1134,32 @@ func TestEEsCfgAsMapInterface(t *testing.T) {
                     "elsIndex": "test",
                     "elsRefresh": "true",
                     "kafkaTopic": "test",
+					"kafkaLinger":"10ms",
+					"kafkaDeliveryTimeout":"1m",
+					"kafkaSkipTLSVerify": false,
+					"kafkaTLS": true,
+					"kafkaCAPath": "/testpath",
                     "elsOpType": "test2",
                     "elsPipeline": "test3",
                     "elsRouting": "test4",
                     "elsTimeout": "1m",
                     "elsWaitForActiveShards": "test6",
-                    "sqlMaxIdleConns": 4,
+					"elsCAPath":"test",
+					"elsDiscoverNodesOnStart":false,
+					"elsDiscoverNodesInterval": "10s",
+					"elsAPIKey":"test",
+					"elsCertificateFingerprint":"test",
+					"elsServiceToken":"test",
+					"elsUsername":"test",
+					"elsPassword":"test",
+					"elsEnableDebugLogger":false,
+					"elsLogger":"test",
+					"elsCompressRequestBody":false,
+					"elsCompressRequestBodyLevel":1,
+					"elsMaxRetries":2,
+					"elsDisableRetry":false,
+					"elsRetryOnStatus":[502, 503, 504],
+					"sqlMaxIdleConns": 4,
                     "sqlMaxOpenConns": 6,
                     "sqlConnMaxLifetime": "1m",
                     "sqlTableName": "table",
@@ -1244,54 +1313,74 @@ func TestEEsCfgAsMapInterface(t *testing.T) {
 				utils.TypeCfg:       "*file_csv",
 				utils.ExportPathCfg: "/tmp/testCSV",
 				utils.OptsCfg: map[string]any{
-					utils.KafkaTopic:                "test",
-					utils.ElsIndex:                  "test",
-					utils.ElsRefresh:                "true",
-					utils.ElsOpType:                 "test2",
-					utils.ElsPipeline:               "test3",
-					utils.ElsRouting:                "test4",
-					utils.ElsTimeout:                "1m0s",
-					utils.ElsWaitForActiveShards:    "test6",
-					utils.SQLMaxIdleConnsCfg:        4,
-					utils.SQLMaxOpenConns:           6,
-					utils.SQLConnMaxLifetime:        "1m0s",
-					utils.SQLTableNameOpt:           "table",
-					utils.SQLDBNameOpt:              "db",
-					utils.SQLUpdateIndexedFieldsOpt: []string{"id"},
-					utils.PgSSLModeCfg:              "pg",
-					utils.AWSToken:                  "token",
-					utils.S3FolderPath:              "s3",
-					utils.NatsJetStream:             true,
-					utils.NatsSubject:               "nat",
-					utils.NatsJWTFile:               "jwt",
-					utils.NatsSeedFile:              "seed",
-					utils.NatsCertificateAuthority:  "NATS",
-					utils.NatsClientCertificate:     "NATSClient",
-					utils.NatsClientKey:             "key",
-					utils.NatsJetStreamMaxWait:      "1m0s",
-					utils.AMQPQueueID:               "id",
-					utils.AMQPRoutingKey:            "key",
-					utils.AMQPExchangeType:          "type",
-					utils.AMQPExchange:              "exchange",
-					utils.AWSRegion:                 "eu",
-					utils.AWSKey:                    "key",
-					utils.AWSSecret:                 "secretkey",
-					utils.SQSQueueID:                "sqsid",
-					utils.SQSForcePathStyle:         true,
-					utils.SQSSkipTlsVerify:          true,
-					utils.S3Bucket:                  "s3",
-					utils.S3ForcePathStyle:          true,
-					utils.S3SkipTlsVerify:           true,
-					utils.RpcCodec:                  "rpc",
-					utils.ServiceMethod:             "service",
-					utils.KeyPath:                   "path",
-					utils.CertPath:                  "certpath",
-					utils.CaPath:                    "capath",
-					utils.Tls:                       true,
-					utils.ConnIDs:                   []string{"id1", "id2"},
-					utils.RpcConnTimeout:            "1m0s",
-					utils.RpcReplyTimeout:           "1m0s",
-					utils.CSVFieldSepOpt:            ",",
+					utils.KafkaTopic:                  "test",
+					utils.KafkaDeliveryTimeout:        "1m0s",
+					utils.KafkaTLS:                    true,
+					utils.KafkaCAPath:                 "/testpath",
+					utils.KafkaSkipTLSVerify:          false,
+					utils.KafkaLinger:                 "10ms",
+					utils.ElsIndex:                    "test",
+					utils.ElsRefresh:                  "true",
+					utils.ElsOpType:                   "test2",
+					utils.ElsPipeline:                 "test3",
+					utils.ElsRouting:                  "test4",
+					utils.ElsTimeout:                  "1m0s",
+					utils.ElsWaitForActiveShards:      "test6",
+					utils.ElsCAPath:                   "test",
+					utils.ElsDiscoverNodesOnStart:     false,
+					utils.ElsDiscoverNodeInterval:     10 * time.Second,
+					utils.ElsAPIKey:                   "test",
+					utils.ElsCertificateFingerprint:   "test",
+					utils.ElsServiceToken:             "test",
+					utils.ElsUsername:                 "test",
+					utils.ElsPassword:                 "test",
+					utils.ElsEnableDebugLogger:        false,
+					utils.ElsLogger:                   "test",
+					utils.ElsCompressRequestBody:      false,
+					utils.ElsCompressRequestBodyLevel: 1,
+					utils.ElsMaxRetries:               2,
+					utils.ElsDisableRetry:             false,
+					utils.ElsRetryOnStatus:            []int{502, 503, 504},
+					utils.SQLMaxIdleConnsCfg:          4,
+					utils.SQLMaxOpenConns:             6,
+					utils.SQLConnMaxLifetime:          "1m0s",
+					utils.SQLTableNameOpt:             "table",
+					utils.SQLDBNameOpt:                "db",
+					utils.SQLUpdateIndexedFieldsOpt:   []string{"id"},
+					utils.PgSSLModeCfg:                "pg",
+					utils.AWSToken:                    "token",
+					utils.S3FolderPath:                "s3",
+					utils.NatsJetStream:               true,
+					utils.NatsSubject:                 "nat",
+					utils.NatsJWTFile:                 "jwt",
+					utils.NatsSeedFile:                "seed",
+					utils.NatsCertificateAuthority:    "NATS",
+					utils.NatsClientCertificate:       "NATSClient",
+					utils.NatsClientKey:               "key",
+					utils.NatsJetStreamMaxWait:        "1m0s",
+					utils.AMQPQueueID:                 "id",
+					utils.AMQPRoutingKey:              "key",
+					utils.AMQPExchangeType:            "type",
+					utils.AMQPExchange:                "exchange",
+					utils.AWSRegion:                   "eu",
+					utils.AWSKey:                      "key",
+					utils.AWSSecret:                   "secretkey",
+					utils.SQSQueueID:                  "sqsid",
+					utils.SQSForcePathStyle:           true,
+					utils.SQSSkipTlsVerify:            true,
+					utils.S3Bucket:                    "s3",
+					utils.S3ForcePathStyle:            true,
+					utils.S3SkipTlsVerify:             true,
+					utils.RpcCodec:                    "rpc",
+					utils.ServiceMethod:               "service",
+					utils.KeyPath:                     "path",
+					utils.CertPath:                    "certpath",
+					utils.CaPath:                      "capath",
+					utils.Tls:                         true,
+					utils.ConnIDs:                     []string{"id1", "id2"},
+					utils.RpcConnTimeout:              "1m0s",
+					utils.RpcReplyTimeout:             "1m0s",
+					utils.CSVFieldSepOpt:              ",",
 					utils.MYSQLDSNParams: map[string]string{
 						"key": "param",
 					},
@@ -1368,7 +1457,7 @@ func TestEEsCfgappendEEsExporters(t *testing.T) {
 
 func TestEEsCfgNewEventExporterCfg(t *testing.T) {
 	str := "test"
-	rcv := NewEventExporterCfg(str, str, str, str, 1, nil)
+	rcv := NewEventExporterCfg(str, str, str, str, 1, false, nil)
 	exp := &EventExporterCfg{
 		ID:             str,
 		Type:           str,
@@ -1392,7 +1481,6 @@ func TestEEsCfgloadFromJSONCfg(t *testing.T) {
 	elsOpts := &ElsOpts{}
 	jsnCfg := &EventExporterOptsJson{
 		CSVFieldSeparator:           &str,
-		ElsCloud:                    &bl,
 		ElsAPIKey:                   &str,
 		ElsServiceToken:             &str,
 		ElsCertificateFingerprint:   &str,
@@ -1466,7 +1554,6 @@ func TestEEsCfgloadFromJSONCfg(t *testing.T) {
 		CAPath:                   &str,
 		DiscoverNodesOnStart:     &bl,
 		DiscoverNodeInterval:     &tm,
-		Cloud:                    &bl,
 		APIKey:                   &str,
 		CertificateFingerprint:   &str,
 		ServiceToken:             &str,
@@ -1630,11 +1717,12 @@ func TestExporterCfg(t *testing.T) {
 func TestLoadFromJSONCfg(t *testing.T) {
 
 	jsonCfg := &EventExporterOptsJson{
-		KafkaTopic:         utils.StringPointer("topic"),
-		KafkaBatchSize:     utils.IntPointer(10),
-		KafkaTLS:           utils.BoolPointer(true),
-		KafkaCAPath:        utils.StringPointer("/path/to/ca"),
-		KafkaSkipTLSVerify: utils.BoolPointer(false),
+		KafkaTopic:           utils.StringPointer("topic"),
+		KafkaLinger:          utils.StringPointer("5ms"),
+		KafkaTLS:             utils.BoolPointer(true),
+		KafkaCAPath:          utils.StringPointer("/path/to/ca"),
+		KafkaSkipTLSVerify:   utils.BoolPointer(false),
+		KafkaDeliveryTimeout: utils.StringPointer("30s"),
 	}
 
 	kafkaOpts := &KafkaOpts{}
@@ -1647,8 +1735,8 @@ func TestLoadFromJSONCfg(t *testing.T) {
 	if *kafkaOpts.Topic != "topic" {
 		t.Errorf("Expected KafkaTopic to be 'topic', got %s", *kafkaOpts.Topic)
 	}
-	if *kafkaOpts.BatchSize != 10 {
-		t.Errorf("Expected KafkaBatchSize to be 10, got %d", *kafkaOpts.BatchSize)
+	if *kafkaOpts.Linger != 5*time.Millisecond {
+		t.Errorf("Expected KafkaLinger to be 5ms, got %v", *kafkaOpts.Linger)
 	}
 	if *kafkaOpts.TLS != true {
 		t.Errorf("Expected KafkaTLS to be true, got %v", *kafkaOpts.TLS)
@@ -1659,16 +1747,36 @@ func TestLoadFromJSONCfg(t *testing.T) {
 	if *kafkaOpts.SkipTLSVerify != false {
 		t.Errorf("Expected KafkaSkipTLSVerify to be false, got %v", *kafkaOpts.SkipTLSVerify)
 	}
+	if *kafkaOpts.DeliveryTimeout != 30*time.Second {
+		t.Errorf("Expected KafkaDeliveryTimeout to be 30s, got %v", *kafkaOpts.DeliveryTimeout)
+	}
+
+	jsnCfg := &EventExporterOptsJson{
+		KafkaTopic:           utils.StringPointer(""),
+		KafkaLinger:          utils.StringPointer("err"),
+		KafkaTLS:             utils.BoolPointer(true),
+		KafkaCAPath:          utils.StringPointer(""),
+		KafkaSkipTLSVerify:   utils.BoolPointer(false),
+		KafkaDeliveryTimeout: utils.StringPointer("err1232"),
+	}
+
+	err = kafkaOpts.loadFromJSONCfg(jsnCfg)
+	expErr := `time: invalid duration "err"`
+	if err != nil && err.Error() != expErr {
+		t.Errorf("Recieved %v", err)
+	}
+
 }
 
 func TestKafkaOptsClone(t *testing.T) {
 
 	originalOpts := &KafkaOpts{
-		Topic:         utils.StringPointer("topic"),
-		BatchSize:     utils.IntPointer(10),
-		TLS:           utils.BoolPointer(true),
-		CAPath:        utils.StringPointer("/ca/path"),
-		SkipTLSVerify: utils.BoolPointer(false),
+		Topic:           utils.StringPointer("topic"),
+		Linger:          utils.DurationPointer(0 * time.Millisecond),
+		TLS:             utils.BoolPointer(true),
+		CAPath:          utils.StringPointer("/ca/path"),
+		SkipTLSVerify:   utils.BoolPointer(false),
+		DeliveryTimeout: utils.DurationPointer(30 * time.Second),
 	}
 
 	clonedOpts := originalOpts.Clone()
@@ -1676,8 +1784,8 @@ func TestKafkaOptsClone(t *testing.T) {
 	if *clonedOpts.Topic != *originalOpts.Topic {
 		t.Errorf("Expected Topic to be copied, got %s vs %s", *clonedOpts.Topic, *originalOpts.Topic)
 	}
-	if *clonedOpts.BatchSize != *originalOpts.BatchSize {
-		t.Errorf("Expected BatchSize to be copied, got %d vs %d", *clonedOpts.BatchSize, *originalOpts.BatchSize)
+	if *clonedOpts.Linger != *originalOpts.Linger {
+		t.Errorf("Expected Linger to be copied, got %v vs %v", *clonedOpts.Linger, *originalOpts.Linger)
 	}
 	if *clonedOpts.TLS != *originalOpts.TLS {
 		t.Errorf("Expected TLS to be copied, got %v vs %v", *clonedOpts.TLS, *originalOpts.TLS)
@@ -1688,9 +1796,197 @@ func TestKafkaOptsClone(t *testing.T) {
 	if *clonedOpts.SkipTLSVerify != *originalOpts.SkipTLSVerify {
 		t.Errorf("Expected SkipTLSVerify to be copied, got %v vs %v", *clonedOpts.SkipTLSVerify, *originalOpts.SkipTLSVerify)
 	}
+	if *clonedOpts.DeliveryTimeout != *originalOpts.DeliveryTimeout {
+		t.Errorf("Expected Timeout to be copied, got %v vs %v", *clonedOpts.DeliveryTimeout, *originalOpts.DeliveryTimeout)
+	}
 
 	*originalOpts.CAPath = "modified/ca/path"
 	if *clonedOpts.CAPath == *originalOpts.CAPath {
 		t.Errorf("Expected cloned CAPath to be separate, got %s", *clonedOpts.CAPath)
+	}
+}
+
+func TestFailedPostsCfgClone(t *testing.T) {
+
+	tests := []struct {
+		name  string
+		fpCfg *FailedPostsCfg
+	}{
+		{
+			name: "Complete FailedPostsCfg",
+			fpCfg: &FailedPostsCfg{
+				Dir:       "/tmp/test",
+				TTL:       3 * time.Second,
+				StaticTTL: false,
+			},
+		},
+		{
+			name:  "Nil FailedPostsCfg",
+			fpCfg: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.fpCfg.Clone()
+
+			if !reflect.DeepEqual(result, tt.fpCfg) {
+				t.Errorf("Clone() = %v, want %v", result, tt.fpCfg)
+			}
+
+			if result != nil && result == tt.fpCfg {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+	}
+}
+
+func TestFailedPostsCfgloadFromJSONCfg(t *testing.T) {
+
+	tests := []struct {
+		name    string
+		jc      *FailedPostsJsonCfg
+		wantErr bool
+	}{
+		{
+			name:    "Nil case",
+			jc:      nil,
+			wantErr: false,
+		},
+		{
+			name: "FailedPostsJsonCfg with data",
+			jc: &FailedPostsJsonCfg{
+				Dir:       utils.StringPointer("/tmp/test"),
+				TTL:       utils.StringPointer("1m0s"),
+				StaticTTL: utils.BoolPointer(false),
+			},
+			wantErr: false,
+		},
+		{
+			name: "Error case",
+			jc: &FailedPostsJsonCfg{
+				Dir:       utils.StringPointer("/tmp/test"),
+				TTL:       utils.StringPointer("err"),
+				StaticTTL: utils.BoolPointer(false),
+			},
+			wantErr: true,
+		},
+		{
+			name: "StaticTTL nil",
+			jc: &FailedPostsJsonCfg{
+				Dir:       utils.StringPointer("/tmp/test"),
+				TTL:       utils.StringPointer("1m0s"),
+				StaticTTL: nil,
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			var fpc FailedPostsCfg
+			err := fpc.loadFromJSONCfg(tt.jc)
+
+			if err != nil {
+				if !tt.wantErr {
+					t.Errorf("loadFromJSONCfg() failed: %v", err)
+				}
+				return
+			}
+		})
+	}
+}
+
+func TestEventExporterCfgClone(t *testing.T) {
+	tests := []struct {
+		name  string
+		eeCfg *EventExporterCfg
+	}{
+		{
+			name: "Complete EventExporterCfg",
+			eeCfg: &EventExporterCfg{
+				ID:            utils.MetaDefault,
+				Type:          utils.MetaNone,
+				ExportPath:    "/var/spool/cgrates/ees",
+				Attempts:      1,
+				Timezone:      utils.EmptyString,
+				Filters:       []string{"randomFiletrs"},
+				AttributeSIDs: []string{"randomID"},
+				Flags:         utils.FlagsWithParams{},
+				contentFields: []*FCTemplate{},
+				Fields: []*FCTemplate{
+					{
+						Tag:    utils.CGRID,
+						Path:   "*exp.CGRID",
+						Type:   utils.MetaVariable,
+						Value:  NewRSRParsersMustCompile("~*req.CGRID", utils.InfieldSep),
+						Layout: time.RFC3339,
+					},
+				},
+				headerFields: []*FCTemplate{
+					{
+						Tag:    utils.CGRID,
+						Path:   "*hdr.CGRID",
+						Type:   utils.MetaVariable,
+						Value:  NewRSRParsersMustCompile("~*req.CGRID", utils.InfieldSep),
+						Layout: time.RFC3339,
+					},
+				},
+				trailerFields: []*FCTemplate{
+					{
+						Tag:    utils.CGRID,
+						Path:   "*trl.CGRID",
+						Type:   utils.MetaVariable,
+						Value:  NewRSRParsersMustCompile("~*req.CGRID", utils.InfieldSep),
+						Layout: time.RFC3339,
+					},
+				},
+				Opts: &EventExporterOpts{
+					Els:   &ElsOpts{},
+					Kafka: &KafkaOpts{},
+					AMQP:  &AMQPOpts{},
+					SQL:   &SQLOpts{},
+					AWS:   &AWSOpts{},
+					NATS:  &NATSOpts{},
+					RPC:   &RPCOpts{},
+				},
+				FailedPostsDir: "/var/spool/cgrates/failed_posts",
+			},
+		},
+		{
+			name: "Nil Opts",
+			eeCfg: &EventExporterCfg{
+				ID:             utils.MetaDefault,
+				Type:           utils.MetaNone,
+				ExportPath:     "/var/spool/cgrates/ees",
+				Attempts:       1,
+				Timezone:       utils.EmptyString,
+				Filters:        []string{},
+				AttributeSIDs:  []string{},
+				Flags:          utils.FlagsWithParams{},
+				contentFields:  []*FCTemplate{},
+				Fields:         []*FCTemplate{},
+				headerFields:   []*FCTemplate{},
+				trailerFields:  []*FCTemplate{},
+				Opts:           nil,
+				FailedPostsDir: "/var/spool/cgrates/failed_posts",
+			},
+		},
+		{
+			name:  "Nil Case",
+			eeCfg: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.eeCfg.Clone()
+
+			if !reflect.DeepEqual(result, tt.eeCfg) {
+				t.Errorf("Clone() = %v, want %v", result, tt.eeCfg)
+			}
+
+			if result != nil && result == tt.eeCfg {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
 	}
 }

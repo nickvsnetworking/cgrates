@@ -1,23 +1,9 @@
 //go:build integration
 // +build integration
 
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package general_tests
 
 import (
@@ -64,7 +50,6 @@ var (
 )
 
 func TestReRateCDRsERs(t *testing.T) {
-	t.Skip() // unfinished, should be able to rerate cdrs using ERs
 	for _, stest := range rrErsCdrsTests {
 		t.Run("ers_rerate", stest)
 	}
@@ -82,7 +67,6 @@ func testRerateCDRsERsCreateFolders(t *testing.T) {
 }
 
 func testRerateCDRsERsDeleteFolders(t *testing.T) {
-	time.Sleep(5 * time.Second)
 	folders := []string{"/tmp/ers/in", "/tmp/ees/mv", "/tmp/ers/out"}
 
 	for _, folder := range folders {
@@ -239,6 +223,7 @@ func testRerateCDRsERsGetCDRs1(t *testing.T) {
 
 }
 
+// use EEs to generate the csv to be put in ERs to rerate with the different usage
 func testRerateCDRsERsExport(t *testing.T) {
 	cgrEv := &engine.CGREventWithEeIDs{
 		CGREvent: cdrEvent,
@@ -263,7 +248,6 @@ func testRerateCDRsERsMoveFiles(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error reading source directory: %v", err)
 	}
-
 	for _, fileInfo := range fileInfos {
 		srcPath := filepath.Join(srcDir, fileInfo.Name())
 		destPath := filepath.Join(destDir, fileInfo.Name())

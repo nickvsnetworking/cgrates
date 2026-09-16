@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package utils
 
 import (
@@ -221,11 +207,11 @@ func TestCGREventFieldAsFloat64(t *testing.T) {
 		t.Errorf("Expecting: %+v, received: %+v", se.Event["Weight"], answ)
 	}
 	answ, err = se.FieldAsFloat64("PddInterval")
-	if err == nil || err.Error() != `strconv.ParseFloat: parsing "1s": invalid syntax` {
-		t.Errorf("Expected %s, received %s", `strconv.ParseFloat: parsing "1s": invalid syntax`, err)
+	if err != nil {
+		t.Error(err)
 	}
-	if answ != 0 {
-		t.Errorf("Expecting: %+v, received: %+v", 0, answ)
+	if answ != float64(time.Second) {
+		t.Errorf("Expecting: %+v, received: %+v", float64(time.Second), answ)
 	}
 
 	if _, err := se.FieldAsFloat64(AnswerTime); err == nil || !strings.HasPrefix(err.Error(), "cannot convert field") {
@@ -395,7 +381,7 @@ func TestCGREventOptAsInt64(t *testing.T) {
 	expected := int64(13)
 
 	if received != expected {
-		t.Errorf("\nExpected: %q, \nReceived: %q", expected, received)
+		t.Errorf("\nExpected: %d, \nReceived: %d", expected, received)
 	}
 	errExpect := ErrNotFound
 	if _, err = ev.OptAsInt64("nonExistingKey"); err == nil || err != errExpect {
@@ -537,15 +523,13 @@ func TestCGREventAsDataProvider(t *testing.T) {
 }
 
 func TestNMAsCGREvent(t *testing.T) {
-	if cgrEv := NMAsCGREvent(nil, "cgrates.org",
-		NestingSep, nil); cgrEv != nil {
-		t.Errorf("expecting: %+v, \nreceived: %+v", ToJSON(nil), ToJSON(cgrEv.Event))
+	if cgrEv := NMAsCGREvent(nil, "cgrates.org", nil); cgrEv != nil {
+		t.Errorf("expecting nil, received: %+v", ToJSON(cgrEv))
 	}
 
 	nM := NewOrderedNavigableMap()
-	if cgrEv := NMAsCGREvent(nM, "cgrates.org",
-		NestingSep, nil); cgrEv != nil {
-		t.Errorf("expecting: %+v, \nreceived: %+v", ToJSON(nil), ToJSON(cgrEv.Event))
+	if cgrEv := NMAsCGREvent(nM, "cgrates.org", nil); cgrEv != nil {
+		t.Errorf("expecting nil, received: %+v", ToJSON(cgrEv))
 	}
 
 	path := []string{"FirstLevel", "SecondLevel", "ThirdLevel", "Fld1"}
@@ -558,10 +542,6 @@ func TestNMAsCGREvent(t *testing.T) {
 
 	path = []string{"FirstLevel2", "SecondLevel2", "Field2"}
 	if err := nM.SetAsSlice(&FullPath{Path: strings.Join(path, NestingSep), PathSlice: path}, []*DataNode{
-		{Type: NMDataType, Value: &DataLeaf{
-			Data:        "attrVal1",
-			AttributeID: "attribute1",
-		}},
 		{Type: NMDataType, Value: &DataLeaf{
 			Data: "Value2",
 		}}}); err != nil {
@@ -576,52 +556,32 @@ func TestNMAsCGREvent(t *testing.T) {
 		t.Error(err)
 	}
 
-	path = []string{"FirstLevel2", "Field5"}
-	if err := nM.SetAsSlice(&FullPath{Path: strings.Join(path, NestingSep), PathSlice: path}, []*DataNode{
-		{Type: NMDataType, Value: &DataLeaf{
-			Data: "Value5",
-		}},
-		{Type: NMDataType, Value: &DataLeaf{
-			Data:        "attrVal5",
-			AttributeID: "attribute5",
-		}}}); err != nil {
-		t.Error(err)
-	}
-
-	path = []string{"FirstLevel2", "Field6"}
-	if err := nM.SetAsSlice(&FullPath{Path: strings.Join(path, NestingSep), PathSlice: path}, []*DataNode{
-		{Type: NMDataType, Value: &DataLeaf{
-			Data:      "Value6",
-			NewBranch: true,
-		}},
-		{Type: NMDataType, Value: &DataLeaf{
-			Data:        "attrVal6",
-			AttributeID: "attribute6",
-		}}}); err != nil {
-		t.Error(err)
-	}
-
 	path = []string{"Field4"}
 	if err := nM.SetAsSlice(&FullPath{Path: strings.Join(path, NestingSep), PathSlice: path}, []*DataNode{
 		{Type: NMDataType, Value: &DataLeaf{
 			Data: "Val4",
-		}},
-		{Type: NMDataType, Value: &DataLeaf{
-			Data:        "attrVal2",
-			AttributeID: "attribute2",
 		}}}); err != nil {
 		t.Error(err)
 	}
+
 	eEv := map[string]any{
-		"FirstLevel2.SecondLevel2.Field2":        "Value2",
-		"FirstLevel.SecondLevel.ThirdLevel.Fld1": "Val1",
-		"FirstLevel2.Field3":                     "Value3",
-		"FirstLevel2.Field5":                     "Value5",
-		"FirstLevel2.Field6":                     "Value6",
-		"Field4":                                 "Val4",
+		"FirstLevel": map[string]any{
+			"SecondLevel": map[string]any{
+				"ThirdLevel": map[string]any{
+					"Fld1": "Val1",
+				},
+			},
+		},
+		"FirstLevel2": map[string]any{
+			"SecondLevel2": map[string]any{
+				"Field2": "Value2",
+			},
+			"Field3": "Value3",
+		},
+		"Field4": "Val4",
 	}
 	if cgrEv := NMAsCGREvent(nM, "cgrates.org",
-		NestingSep, MapStorage{}); cgrEv.Tenant != "cgrates.org" ||
+		MapStorage{}); cgrEv.Tenant != "cgrates.org" ||
 		cgrEv.Time == nil ||
 		!reflect.DeepEqual(eEv, cgrEv.Event) {
 		t.Errorf("expecting: %+v, \nreceived: %+v", ToJSON(eEv), ToJSON(cgrEv.Event))

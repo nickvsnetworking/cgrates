@@ -1,23 +1,8 @@
 //go:build integration
 // +build integration
 
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package v1
 
@@ -26,6 +11,7 @@ import (
 	"os/exec"
 	"path"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -57,6 +43,7 @@ var (
 		testConfigSSetConfigFromJSONCoreS,
 		testConfigSReloadConfigCoreSDryRun,
 		testConfigSReloadConfigCoreS,
+		testConfigSSetConfigInvalidExporters,
 		testConfigSKillEngine,
 		testConfigSStartEngineCAPSAllocated,
 		testConfigSCAPSPeak,
@@ -147,12 +134,14 @@ func testConfigSSetConfigSessionS(t *testing.T) {
 	exp := map[string]any{
 		"enabled":                    true,
 		"channel_sync_interval":      "0",
+		utils.ChannelSyncTimeoutCfg:  "1m0s",
 		"alterable_fields":           []any{},
 		"client_protocol":            2.,
 		"debit_interval":             "0",
 		"stale_chan_max_extra_usage": "0",
 		"session_ttl":                "0",
 		"session_indexes":            []any{utils.OriginID},
+		utils.ApierSConnsCfg:         []any{},
 		"attributes_conns":           []any{utils.MetaLocalHost},
 		"cdrs_conns":                 []any{utils.MetaInternal},
 		"chargers_conns":             []any{utils.MetaInternal},
@@ -185,27 +174,29 @@ func testConfigSSetConfigSessionS(t *testing.T) {
 	if *utils.Encoding == utils.MetaGOB {
 		var empty []string
 		exp = map[string]any{
-			"enabled":               true,
-			"chargers_conns":        []string{utils.MetaInternal},
-			"rals_conns":            []string{utils.MetaInternal},
-			"resources_conns":       []string{utils.MetaLocalHost},
-			utils.IPsConnsCfg:       empty,
-			"thresholds_conns":      empty,
-			"stats_conns":           empty,
-			"routes_conns":          []string{utils.MetaLocalHost},
-			"attributes_conns":      []string{utils.MetaLocalHost},
-			"cdrs_conns":            []string{utils.MetaInternal},
-			"replication_conns":     empty,
-			"scheduler_conns":       empty,
-			"session_indexes":       []string{"OriginID"},
-			"client_protocol":       2.,
-			"terminate_attempts":    5,
-			"channel_sync_interval": "0",
-			"debit_interval":        "0",
-			"session_ttl":           "0",
-			"store_session_costs":   false,
-			"min_dur_low_balance":   "0",
-			"alterable_fields":      empty,
+			"enabled":                   true,
+			utils.ApierSConnsCfg:        empty,
+			"chargers_conns":            []string{utils.MetaInternal},
+			"rals_conns":                []string{utils.MetaInternal},
+			"resources_conns":           []string{utils.MetaLocalHost},
+			utils.IPsConnsCfg:           empty,
+			"thresholds_conns":          empty,
+			"stats_conns":               empty,
+			"routes_conns":              []string{utils.MetaLocalHost},
+			"attributes_conns":          []string{utils.MetaLocalHost},
+			"cdrs_conns":                []string{utils.MetaInternal},
+			"replication_conns":         empty,
+			"scheduler_conns":           empty,
+			"session_indexes":           []string{"OriginID"},
+			"client_protocol":           2.,
+			"terminate_attempts":        5,
+			"channel_sync_interval":     "0",
+			utils.ChannelSyncTimeoutCfg: "1m0s",
+			"debit_interval":            "0",
+			"session_ttl":               "0",
+			"store_session_costs":       false,
+			"min_dur_low_balance":       "0",
+			"alterable_fields":          empty,
 			"stir": map[string]any{
 				"allowed_attest":      []string{utils.MetaAny},
 				"default_attest":      "A",
@@ -238,6 +229,7 @@ func testConfigSSetConfigSessionS(t *testing.T) {
 func testConfigSv1GetJSONSectionWithoutTenant(t *testing.T) {
 	exp := map[string]any{
 		"enabled":                    true,
+		utils.ApierSConnsCfg:         []any{},
 		"chargers_conns":             []any{utils.MetaInternal},
 		"rals_conns":                 []any{utils.MetaInternal},
 		"resources_conns":            []any{utils.MetaLocalHost},
@@ -253,6 +245,7 @@ func testConfigSv1GetJSONSectionWithoutTenant(t *testing.T) {
 		"client_protocol":            2.,
 		"terminate_attempts":         5.,
 		"channel_sync_interval":      "0",
+		utils.ChannelSyncTimeoutCfg:  "1m0s",
 		"debit_interval":             "0",
 		"session_ttl":                "0",
 		"stale_chan_max_extra_usage": "0",
@@ -278,6 +271,7 @@ func testConfigSv1GetJSONSectionWithoutTenant(t *testing.T) {
 		var empty []string
 		exp = map[string]any{
 			"enabled":                    true,
+			utils.ApierSConnsCfg:         empty,
 			"chargers_conns":             []string{utils.MetaInternal},
 			"rals_conns":                 []string{utils.MetaInternal},
 			"resources_conns":            []string{utils.MetaLocalHost},
@@ -293,6 +287,7 @@ func testConfigSv1GetJSONSectionWithoutTenant(t *testing.T) {
 			"client_protocol":            2.,
 			"terminate_attempts":         5,
 			"channel_sync_interval":      "0",
+			utils.ChannelSyncTimeoutCfg:  "1m0s",
 			"debit_interval":             "0",
 			"session_ttl":                "0",
 			"stale_chan_max_extra_usage": "0",
@@ -583,6 +578,183 @@ func testConfigSReloadConfigCoreS(t *testing.T) {
 	} else if cfgStr != rpl {
 		t.Errorf("Expected %q , received: %q", cfgStr, rpl)
 	}
+}
+
+func testConfigSSetConfigInvalidExporters(t *testing.T) {
+	if *utils.Encoding == utils.MetaGOB {
+		t.SkipNow()
+	}
+	var reply string
+	if err := configRPC.Call(context.Background(), utils.ConfigSv1SetConfig, &config.SetConfigArgs{
+		Config: map[string]any{
+			"ees": map[string]any{
+				"enabled": true,
+				"exporters": []any{map[string]any{
+					"id":   "test_exporter_valid",
+					"type": utils.MetaNone,
+				}},
+			},
+		},
+	}, &reply); err != nil {
+		t.Error(err)
+	} else if reply != utils.OK {
+		t.Errorf("Expected OK received: %s", reply)
+	}
+
+	t.Run("invalid exporter ID is rejected and config remains unchanged", func(t *testing.T) {
+		var rpl map[string]any
+		if err := configRPC.Call(context.Background(), utils.ConfigSv1GetConfig, &config.SectionWithAPIOpts{
+			Section: config.CDRS_JSN,
+		}, &rpl); err != nil {
+			t.Fatal(err)
+		}
+		originalExports := rpl[config.CDRS_JSN].(map[string]any)["online_cdr_exports"].([]any)
+
+		err := configRPC.Call(context.Background(), utils.ConfigSv1SetConfig, &config.SetConfigArgs{
+			Config: map[string]any{
+				"cdrs": map[string]any{
+					"online_cdr_exports": []string{"fake_id"},
+				},
+			},
+		}, &reply)
+		if err == nil {
+			t.Error("Expected error for invalid exporter ID, got nil")
+		}
+
+		if err := configRPC.Call(context.Background(), utils.ConfigSv1GetConfig, &config.SectionWithAPIOpts{
+			Section: config.CDRS_JSN,
+		}, &rpl); err != nil {
+			t.Fatal(err)
+		}
+		currentExports := rpl[config.CDRS_JSN].(map[string]any)["online_cdr_exports"].([]any)
+		if len(currentExports) != len(originalExports) {
+			t.Errorf("Config err, expected %+v, got %+v", originalExports, currentExports)
+		}
+	})
+
+	t.Run("all invalid IDs reported at once", func(t *testing.T) {
+		err := configRPC.Call(context.Background(), utils.ConfigSv1SetConfig, &config.SetConfigArgs{
+			Config: map[string]any{
+				"cdrs": map[string]any{
+					"online_cdr_exports": []string{"test_exporter_valid", "fake_id_1", "fake_id_2"},
+				},
+			},
+		}, &reply)
+		if err == nil {
+			t.Fatal("Expected error for invalid exporter IDs, got nil")
+		}
+		errMsg := err.Error()
+		for _, id := range []string{"fake_id_1", "fake_id_2"} {
+			if !strings.Contains(errMsg, id) {
+				t.Errorf("Expected error to mention %q, got: %s", id, errMsg)
+			}
+		}
+	})
+
+	t.Run("empty string ID reported", func(t *testing.T) {
+		err := configRPC.Call(context.Background(), utils.ConfigSv1SetConfig, &config.SetConfigArgs{
+			Config: map[string]any{
+				"cdrs": map[string]any{
+					"online_cdr_exports": []string{"test_exporter_valid", ""},
+				},
+			},
+		}, &reply)
+		if err == nil {
+			t.Fatal("Expected error for empty string ID, got nil")
+		}
+	})
+
+	t.Run("valid invalid and empty exporter IDs leaves config unchanged", func(t *testing.T) {
+		var rpl map[string]any
+		if err := configRPC.Call(context.Background(), utils.ConfigSv1GetConfig, &config.SectionWithAPIOpts{
+			Section: config.CDRS_JSN,
+		}, &rpl); err != nil {
+			t.Fatal(err)
+		}
+		originalExports := rpl[config.CDRS_JSN].(map[string]any)["online_cdr_exports"].([]any)
+
+		err := configRPC.Call(context.Background(), utils.ConfigSv1SetConfig, &config.SetConfigArgs{
+			Config: map[string]any{
+				"cdrs": map[string]any{
+					"online_cdr_exports": []string{"test_exporter_valid", "fake_id", ""},
+				},
+			},
+		}, &reply)
+		if err == nil {
+			t.Fatal("Expected error for invalid exporter IDs, got nil")
+		}
+
+		if err := configRPC.Call(context.Background(), utils.ConfigSv1GetConfig, &config.SectionWithAPIOpts{
+			Section: config.CDRS_JSN,
+		}, &rpl); err != nil {
+			t.Fatal(err)
+		}
+		currentExports := rpl[config.CDRS_JSN].(map[string]any)["online_cdr_exports"].([]any)
+		if len(currentExports) != len(originalExports) {
+			t.Errorf("Config err, expected %+v, got %+v", originalExports, currentExports)
+		}
+	})
+
+	t.Run("valid SetConfig after failed config", func(t *testing.T) {
+		if err := configRPC.Call(context.Background(), utils.ConfigSv1SetConfig, &config.SetConfigArgs{
+			Config: map[string]any{
+				"cdrs": map[string]any{
+					"online_cdr_exports": []string{"test_exporter_valid"},
+				},
+			},
+		}, &reply); err != nil {
+			t.Fatal(err)
+		} else if reply != utils.OK {
+			t.Errorf("Expected OK received: %s", reply)
+		}
+
+		var rpl map[string]any
+		if err := configRPC.Call(context.Background(), utils.ConfigSv1GetConfig, &config.SectionWithAPIOpts{
+			Section: config.CDRS_JSN,
+		}, &rpl); err != nil {
+			t.Fatal(err)
+		}
+		exports := rpl[config.CDRS_JSN].(map[string]any)["online_cdr_exports"].([]any)
+		if len(exports) != 1 || exports[0] != "test_exporter_valid" {
+			t.Errorf("Expected [test_exporter_valid], received: %+v", exports)
+		}
+	})
+
+	t.Run("DryRun does not apply valid config", func(t *testing.T) {
+		if err := configRPC.Call(context.Background(), utils.ConfigSv1SetConfig, &config.SetConfigArgs{
+			Config: map[string]any{
+				"cdrs": map[string]any{
+					"online_cdr_exports": []string{},
+				},
+			},
+		}, &reply); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := configRPC.Call(context.Background(), utils.ConfigSv1SetConfig, &config.SetConfigArgs{
+			Config: map[string]any{
+				"cdrs": map[string]any{
+					"online_cdr_exports": []string{"test_exporter_valid"},
+				},
+			},
+			DryRun: true,
+		}, &reply); err != nil {
+			t.Fatal(err)
+		} else if reply != utils.OK {
+			t.Errorf("Expected OK for DryRun, received: %s", reply)
+		}
+
+		var rpl map[string]any
+		if err := configRPC.Call(context.Background(), utils.ConfigSv1GetConfig, &config.SectionWithAPIOpts{
+			Section: config.CDRS_JSN,
+		}, &rpl); err != nil {
+			t.Fatal(err)
+		}
+		exports := rpl[config.CDRS_JSN].(map[string]any)["online_cdr_exports"].([]any)
+		if len(exports) != 0 {
+			t.Errorf("DryRun applied changes, expected empty, got: %+v", exports)
+		}
+	})
 }
 
 func testConfigSStartEngineCAPSAllocated(t *testing.T) {

@@ -1,23 +1,9 @@
 //go:build integration
 // +build integration
 
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package v1
 
 import (
@@ -1112,8 +1098,8 @@ func testV1STSProcessCDRStat(t *testing.T) {
 		ToR:         "*data",
 		Cost:        1.01,
 		AccountSummary: &engine.AccountSummary{
-			Tenant: "cgrates.org",
-			ID:     "AccountFromAccountSummary",
+			Tenant:    "cgrates.org",
+			AccountID: "AccountFromAccountSummary",
 			BalanceSummaries: []*engine.BalanceSummary{
 				{
 					UUID:  "f9be602747f4",
@@ -1520,7 +1506,7 @@ func testV1STSSimulateAccountUpdate(t *testing.T) {
 			ID:     "StatForAccountUpdate",
 			FilterIDs: []string{
 				"*string:~*opts.*eventType:AccountUpdate",
-				"*string:~*asm.ID:testV1STSSimulateAccountUpdate",
+				"*string:~*asm.AccountID:testV1STSSimulateAccountUpdate",
 			},
 			ActivationInterval: &utils.ActivationInterval{
 				ActivationTime: time.Date(2014, 7, 14, 14, 25, 0, 0, time.UTC),

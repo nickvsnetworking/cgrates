@@ -1,24 +1,11 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package utils
 
 import (
 	"reflect"
+	"regexp"
 	"testing"
 )
 
@@ -462,5 +449,55 @@ func TestRSRFilterPassMatchLessThan(t *testing.T) {
 	result := fltr.Pass("string")
 	if !reflect.DeepEqual(false, result) {
 		t.Errorf("Expected <false> ,received: <%+v>", result)
+	}
+}
+
+func TestRSRFilter_Clone(t *testing.T) {
+	tests := []struct {
+		name    string
+		fltrVal *RSRFilter
+	}{
+		{
+			name: "Complete RSRRFilter",
+			fltrVal: &RSRFilter{
+				filterRule: "^rule1$",
+				fltrRgxp:   &regexp.Regexp{},
+				negative:   false,
+			},
+		},
+		{
+			name: "Nil fltrRgxp RSRRFilter",
+			fltrVal: &RSRFilter{
+				filterRule: "^rule1$",
+				fltrRgxp:   nil,
+				negative:   false,
+			},
+		},
+		{
+			name: "Empty filter rule RSRRFilter",
+			fltrVal: &RSRFilter{
+				filterRule: "",
+				fltrRgxp:   &regexp.Regexp{},
+				negative:   false,
+			},
+		},
+		{
+			name:    "Nil RSRRFilter",
+			fltrVal: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			got := tt.fltrVal.Clone()
+
+			if !reflect.DeepEqual(got, tt.fltrVal) {
+				t.Errorf("Clone() = %v, want %v", got, tt.fltrVal)
+			}
+
+			if got != nil && got == tt.fltrVal {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
 	}
 }

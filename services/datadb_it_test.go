@@ -1,23 +1,9 @@
 //go:build integration
 // +build integration
 
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package services
 
 import (
@@ -94,6 +80,7 @@ func TestDataDBReload(t *testing.T) {
 			InternalDBStartTimeout:  5 * time.Minute,
 			InternalDBFileSizeLimit: 1073741824,
 			MongoConnScheme:         "mongodb",
+			RedisBatchSize:          1000,
 			RedisMaxConns:           10,
 			RedisConnectAttempts:    20,
 			RedisSentinel:           "",
@@ -102,8 +89,6 @@ func TestDataDBReload(t *testing.T) {
 			RedisClusterOndownDelay: 0,
 			RedisPoolPipelineWindow: 150 * time.Microsecond,
 			RedisConnectTimeout:     0,
-			RedisReadTimeout:        0,
-			RedisWriteTimeout:       0,
 			MongoQueryTimeout:       10 * time.Second,
 			RedisTLS:                false,
 		},
@@ -231,6 +216,7 @@ func TestDataDBReloadBadType(t *testing.T) {
 		Name: "10",
 		User: "cgrates",
 		Opts: &config.DataDBOpts{
+			RedisBatchSize:          1000,
 			RedisMaxConns:           10,
 			RedisConnectAttempts:    20,
 			RedisSentinel:           "",
@@ -239,8 +225,6 @@ func TestDataDBReloadBadType(t *testing.T) {
 			RedisClusterOndownDelay: 0,
 			RedisPoolPipelineWindow: 150 * time.Microsecond,
 			RedisConnectTimeout:     0,
-			RedisReadTimeout:        0,
-			RedisWriteTimeout:       0,
 			MongoQueryTimeout:       10 * time.Second,
 			RedisTLS:                false,
 		},
@@ -354,6 +338,7 @@ func TestDataDBReloadErrorMarsheler(t *testing.T) {
 		Name: "10",
 		User: "cgrates",
 		Opts: &config.DataDBOpts{
+			RedisBatchSize:          1000,
 			RedisMaxConns:           10,
 			RedisConnectAttempts:    20,
 			RedisSentinel:           "",
@@ -362,8 +347,6 @@ func TestDataDBReloadErrorMarsheler(t *testing.T) {
 			RedisClusterOndownDelay: 0,
 			RedisPoolPipelineWindow: 150 * time.Microsecond,
 			RedisConnectTimeout:     0,
-			RedisReadTimeout:        0,
-			RedisWriteTimeout:       0,
 			MongoQueryTimeout:       10 * time.Second,
 			RedisTLS:                false,
 		},
@@ -572,6 +555,7 @@ func TestDataDBReloadCastError(t *testing.T) {
 		Name: "10",
 		User: "cgrates",
 		Opts: &config.DataDBOpts{
+			RedisBatchSize:          1000,
 			RedisMaxConns:           10,
 			RedisConnectAttempts:    20,
 			RedisSentinel:           "",
@@ -580,8 +564,6 @@ func TestDataDBReloadCastError(t *testing.T) {
 			RedisClusterOndownDelay: 0,
 			RedisPoolPipelineWindow: 150 * time.Microsecond,
 			RedisConnectTimeout:     0,
-			RedisReadTimeout:        0,
-			RedisWriteTimeout:       0,
 			MongoQueryTimeout:       10 * time.Second,
 			RedisTLS:                false,
 		},
@@ -714,6 +696,7 @@ func TestDataDBReloadError(t *testing.T) {
 		Name: "10",
 		User: "cgrates",
 		Opts: &config.DataDBOpts{
+			RedisBatchSize:          1000,
 			RedisMaxConns:           10,
 			RedisConnectAttempts:    20,
 			RedisSentinel:           "",
@@ -722,8 +705,6 @@ func TestDataDBReloadError(t *testing.T) {
 			RedisClusterOndownDelay: 0,
 			RedisPoolPipelineWindow: 150 * time.Microsecond,
 			RedisConnectTimeout:     0,
-			RedisReadTimeout:        0,
-			RedisWriteTimeout:       0,
 			MongoQueryTimeout:       10 * time.Second,
 			RedisTLS:                false,
 		},

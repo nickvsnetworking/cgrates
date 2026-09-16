@@ -1,22 +1,7 @@
 //go:build flaky
 
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package main
 
@@ -39,6 +24,14 @@ import (
 )
 
 func TestLoadConfig(t *testing.T) {
+	switch *utils.DBType {
+	case utils.MetaInternal:
+	case utils.MetaMySQL, utils.MetaMongo, utils.MetaPostgres:
+		t.SkipNow()
+	default:
+		t.Fatal("unsupported dbtype value")
+	}
+
 	// DataDb
 	*cfgPath = path.Join(*utils.DataDir, "conf", "samples", "tutmongo")
 	*dataDBType = utils.MetaRedis
@@ -57,14 +50,19 @@ func TestLoadConfig(t *testing.T) {
 		User:     "cgrates2",
 		Password: "toor",
 		Opts: &config.DataDBOpts{
+			InternalDBDumpPath:      "/var/lib/cgrates/internal_db/datadb",
+			InternalDBBackupPath:    "/var/lib/cgrates/internal_db/backup/datadb",
+			InternalDBStartTimeout:  5 * time.Minute,
+			InternalDBFileSizeLimit: 1 << 30,
+			RedisBatchSize:          1000,
 			RedisMaxConns:           10,
 			RedisConnectAttempts:    20,
 			RedisSentinel:           "sentinel1",
 			RedisCluster:            false,
 			RedisClusterSync:        5 * time.Second,
 			RedisClusterOndownDelay: 0,
-			RedisPoolPipelineWindow: 150 * time.Microsecond,
 			RedisConnectTimeout:     5 * time.Second,
+			RedisPoolPipelineWindow: 150 * time.Microsecond,
 			MongoQueryTimeout:       10 * time.Second,
 			MongoConnScheme:         "mongodb",
 			RedisTLS:                false,
@@ -89,13 +87,19 @@ func TestLoadConfig(t *testing.T) {
 		StringIndexedFields: []string{},
 		PrefixIndexedFields: []string{},
 		Opts: &config.StorDBOpts{
-			SQLMaxOpenConns:    100,
-			SQLMaxIdleConns:    10,
-			SQLConnMaxLifetime: 0,
-			MongoQueryTimeout:  10 * time.Second,
-			PgSSLMode:          "disable",
-			MySQLLocation:      "Local",
-			MySQLDSNParams:     map[string]string{},
+			InternalDBDumpPath:      "/var/lib/cgrates/internal_db/stordb",
+			InternalDBBackupPath:    "/var/lib/cgrates/internal_db/backup/stordb",
+			InternalDBStartTimeout:  5 * time.Minute,
+			InternalDBFileSizeLimit: 1 << 30,
+			SQLMaxOpenConns:         100,
+			SQLMaxIdleConns:         10,
+			SQLConnMaxLifetime:      0,
+			SQLLogLevel:             3,
+			MongoQueryTimeout:       10 * time.Second,
+			MongoConnScheme:         "mongodb",
+			PgSSLMode:               "disable",
+			MySQLLocation:           "Local",
+			MySQLDSNParams:          map[string]string{},
 		},
 	}
 	// Loader

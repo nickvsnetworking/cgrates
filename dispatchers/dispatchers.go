@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package dispatchers
 
@@ -286,8 +271,6 @@ func (dS *DispatcherService) Dispatch(ev *utils.CGREvent, subsys string,
 	}
 	if dPrfls, err = dS.dispatcherProfilesForEvent(tnt, ev, evNm, subsys); err != nil {
 		return utils.NewErrDispatcherS(err)
-	} else if len(dPrfls) == 0 { // no profiles matched
-		return utils.NewErrDispatcherS(utils.ErrPrefixNotFound("PROFILE"))
 	} else if isInternalDispatcherProfile(dPrfls[0]) { // dispatcherS was disabled
 		return callDH(newInternalHost(tnt), utils.EmptyString, nil,
 			serviceMethod, args, reply)

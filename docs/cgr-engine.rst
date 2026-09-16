@@ -69,12 +69,14 @@ The components from the diagram can be found documented in the links bellow:
    rals
    cdrs
    ees
+   ers
    attributes
    chargers
    resources
    routes
    stats
    trends
+   rankings
    thresholds
    filters
    dispatchers
@@ -87,4 +89,5 @@ The components from the diagram can be found documented in the links bellow:
    stordb
    rpcconns
    rsr
+   analyzers
    

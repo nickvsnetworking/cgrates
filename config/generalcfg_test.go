@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package config
 
 import (
@@ -43,6 +29,7 @@ func TestGeneralCfgloadFromJsonCfg(t *testing.T) {
 		Reply_timeout:        utils.StringPointer("2s"),
 		Digest_separator:     utils.StringPointer(","),
 		Digest_equal:         utils.StringPointer(":"),
+		Caching_delay:        utils.StringPointer("5s"),
 	}
 
 	expected := &GeneralCfg{
@@ -66,6 +53,7 @@ func TestGeneralCfgloadFromJsonCfg(t *testing.T) {
 		MaxParallelConns: 100,
 		RSRSep:           ";",
 		DefaultCaching:   utils.MetaReload,
+		CachingDelay:     5 * time.Second,
 	}
 	jsnCfg := NewDefaultCGRConfig()
 	if err := jsnCfg.generalCfg.loadFromJSONCfg(cfgJSON); err != nil {
@@ -104,6 +92,14 @@ func TestGeneralParseDurationCfgloadFromJsonCfg(t *testing.T) {
 	}
 	jsonCfg = NewDefaultCGRConfig()
 	if err := jsonCfg.generalCfg.loadFromJSONCfg(cfgJSON2); err == nil || err.Error() != expected {
+		t.Errorf("Expected %+v, received %v", expected, err)
+	}
+
+	cfgJSON3 := &GeneralJsonCfg{
+		Caching_delay: utils.StringPointer("1ss"),
+	}
+	jsonCfg = NewDefaultCGRConfig()
+	if err := jsonCfg.generalCfg.loadFromJSONCfg(cfgJSON3); err == nil || err.Error() != expected {
 		t.Errorf("Expected %+v, received %v", expected, err)
 	}
 
@@ -240,6 +236,12 @@ func TestGeneralCfgClone(t *testing.T) {
 	}
 	if rcv.NodeID = ""; ban.NodeID != "randomID" {
 		t.Errorf("Expected clone to not modify the cloned")
+	}
+
+	ban = nil
+	rcv = ban.Clone()
+	if !reflect.DeepEqual(ban, rcv) {
+		t.Errorf("Expected: %+v\nReceived: %+v", utils.ToJSON(ban), utils.ToJSON(rcv))
 	}
 }
 

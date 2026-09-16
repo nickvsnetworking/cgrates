@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package sessions
 
@@ -409,7 +394,7 @@ func TestForceSTerminatorClientCall(t *testing.T) {
 		utils.ConcatenatedKey(utils.MetaInternal, utils.MetaResources): nil,
 	})
 	sessions := NewSessionS(cfg, dm, connMgr)
-	sessions.RegisterIntBiJConn(sTestMock, utils.EmptyString)
+	sessions.sBiRPCClients.RegisterIntBiJConn(sTestMock, "ClientConnID", 0)
 
 	ss := &Session{
 		CGRID:        "CGRID",
@@ -767,7 +752,7 @@ func TestDebitLoopSessionErrorDebiting(t *testing.T) {
 	sessions = NewSessionS(cfg, dm, connMgr)
 
 	sTestMock := &testMockClientConnDiscSess{}
-	sessions.RegisterIntBiJConn(sTestMock, utils.EmptyString)
+	sessions.sBiRPCClients.RegisterIntBiJConn(sTestMock, "ClientConnIdtest", 0)
 
 	if _, err = sessions.debitLoopSession(ss, 0, time.Hour); err != nil {
 		t.Error(err)
@@ -1056,7 +1041,7 @@ func TestDebitLoopSessionDisconnectSession(t *testing.T) {
 	sessions := NewSessionS(cfg, dm, connMgr)
 
 	sTestMock := &testMockClientConnDiscSess{}
-	sessions.RegisterIntBiJConn(sTestMock, utils.EmptyString)
+	sessions.sBiRPCClients.RegisterIntBiJConn(sTestMock, "ClientConnID", 2.0)
 
 	ss := &Session{
 		CGRID:         "CGRID",
@@ -1315,6 +1300,10 @@ func TestRoundCost(t *testing.T) {
 		Tenant: "cgrates.org",
 		SRuns: []*SRun{
 			{
+				CD: &engine.CallDescriptor{
+					Tenant:  "cgrates.org",
+					Account: "1001",
+				},
 				EventCost: &engine.EventCost{
 					AccountSummary: &engine.AccountSummary{},
 					Usage:          utils.DurationPointer(30 * time.Second),
@@ -1384,20 +1373,16 @@ func TestDisconnectSession(t *testing.T) {
 	}
 
 	sTestMock := &testMockClientConn{}
-	sessions.RegisterIntBiJConn(sTestMock, utils.EmptyString)
-	sessions.biJIDs["test"] = &biJClient{
-		conn: sTestMock,
-	}
+	sessions.sBiRPCClients.RegisterIntBiJConn(sTestMock, utils.EmptyString, 0)
+	sessions.sBiRPCClients.RegisterIntBiJConn(sTestMock, "test", 0)
 
 	if err := sessions.disconnectSession(ss, utils.EmptyString); err == nil || err != utils.ErrNoActiveSession {
 		t.Errorf("Expected %+v, received %+v", utils.ErrNoActiveSession, err)
 	}
 
 	sTestMock1 := &mockConnWarnDisconnect1{}
-	sessions.RegisterIntBiJConn(sTestMock1, utils.EmptyString)
-	sessions.biJIDs["test"] = &biJClient{
-		conn: sTestMock1,
-	}
+	sessions.sBiRPCClients.RegisterIntBiJConn(sTestMock1, utils.EmptyString, 0)
+	sessions.sBiRPCClients.RegisterIntBiJConn(sTestMock1, "test", 0)
 	if err := sessions.disconnectSession(ss, utils.EmptyString); err != nil {
 		t.Error(err)
 	}
@@ -1824,7 +1809,7 @@ func TestSyncSessions(t *testing.T) {
 	sessions := NewSessionS(cfg, dm, connMgr)
 
 	sTestMock1 := &testMockClientSyncSessions{}
-	sessions.RegisterIntBiJConn(sTestMock1, utils.EmptyString)
+	sessions.sBiRPCClients.RegisterIntBiJConn(sTestMock1, utils.EmptyString, 0)
 
 	sessions.aSessions = map[string]*Session{
 		"SESS1": {

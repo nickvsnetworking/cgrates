@@ -1,40 +1,23 @@
 //go:build integration
 // +build integration
 
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package ers
 
 import (
+	"context"
 	"fmt"
-	"net"
 	"reflect"
-	"strconv"
 	"testing"
 	"time"
-
-	"github.com/cgrates/birpc/context"
 
 	"github.com/cgrates/cgrates/config"
 	"github.com/cgrates/cgrates/engine"
 	"github.com/cgrates/cgrates/utils"
-	kafka "github.com/segmentio/kafka-go"
+	"github.com/twmb/franz-go/pkg/kadm"
+	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 var (
@@ -47,52 +30,34 @@ var (
 func TestKafkaER(t *testing.T) {
 
 	// Create kafka topic
-	conn, err := kafka.Dial("tcp", "localhost:9092")
+	cl, err := kgo.NewClient(kgo.SeedBrokers("localhost:9092"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer conn.Close()
-
-	controller, err := conn.Controller()
+	adm := kadm.NewClient(cl)
+	_, err = adm.CreateTopics(context.Background(), 1, 1, nil, utils.KafkaDefaultTopic)
 	if err != nil {
 		t.Fatal(err)
 	}
-	controllerConn, err := kafka.Dial("tcp", net.JoinHostPort(controller.Host, strconv.Itoa(controller.Port)))
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer controllerConn.Close()
-
-	topicConfigs := []kafka.TopicConfig{
-		{
-			Topic:             utils.KafkaDefaultTopic,
-			NumPartitions:     1,
-			ReplicationFactor: 1,
-		},
-	}
-
-	err = controllerConn.CreateTopics(topicConfigs...)
-	if err != nil {
-		t.Fatal(err)
-	}
+	cl.Close()
 
 	cfg, err := config.NewCGRConfigFromJSONStringWithDefaults(`{
-"ers": {									
-	"enabled": true,						
+"ers": {
+	"enabled": true,
 	"sessions_conns":["*localhost"],
 	"readers": [
 		{
-			"id": "kafka",										
-			"type": "*kafka_json_map",							
-			"run_delay":  "-1",									
-			"concurrent_requests": 1024,						
+			"id": "kafka",
+			"type": "*kafka_json_map",
+			"run_delay":  "-1",
+			"concurrent_requests": 1024,
 			"source_path": "localhost:9092",
 			"tenant": "cgrates.org",
 			"filters": [],
 			"flags": [],
 			"fields":[
 				{"tag": "CGRID", "type": "*composed", "value": "~*req.CGRID", "path": "*cgreq.CGRID"},
-				{"tag": "readerId", "type": "*variable", "value": "~*vars.*readerID", "path": "*cgreq.ReaderID"},
+				{"tag": "readerId", "type": "*variable", "value": "~*vars.*readerID", "path": "*cgreq.ReaderID"}
 			]
 		}
 	]
@@ -116,22 +81,21 @@ func TestKafkaER(t *testing.T) {
 
 	randomCGRID := utils.UUIDSha1Prefix()
 	go func(key string) {
-		w := kafka.Writer{
-			Addr:  kafka.TCP("localhost:9092"),
-			Topic: utils.KafkaDefaultTopic,
-		}
-		err := w.WriteMessages(context.Background(),
-			kafka.Message{
-				Key:   []byte(randomCGRID), // for the moment we do not process the key
-				Value: []byte(fmt.Sprintf(`{"CGRID": "%s"}`, randomCGRID)),
-			},
+		produceCl, err := kgo.NewClient(
+			kgo.SeedBrokers("localhost:9092"),
+			kgo.DefaultProduceTopic(utils.KafkaDefaultTopic),
 		)
 		if err != nil {
-			t.Error("failed to write messages:", err)
+			t.Error("failed to create producer:", err)
+			return
 		}
-		err = w.Close()
-		if err != nil {
-			t.Error("failed to close writer:", err)
+		defer produceCl.Close()
+		res := produceCl.ProduceSync(context.Background(), &kgo.Record{
+			Key:   []byte(randomCGRID),
+			Value: []byte(fmt.Sprintf(`{"CGRID": "%s"}`, randomCGRID)),
+		})
+		if err := res.FirstErr(); err != nil {
+			t.Error("failed to write messages:", err)
 		}
 	}(randomCGRID)
 
@@ -161,22 +125,30 @@ func TestKafkaER(t *testing.T) {
 	close(rdrExit)
 
 	// Delete kafka topic
-	partitions, err := conn.ReadPartitions(utils.KafkaDefaultTopic)
+	cl2, err := kgo.NewClient(kgo.SeedBrokers("localhost:9092"))
 	if err != nil {
 		t.Fatal(err)
 	}
+	defer cl2.Close()
+	adm2 := kadm.NewClient(cl2)
 
-	if len(partitions) != 1 || partitions[0].Topic != utils.KafkaDefaultTopic {
+	topics, err := adm2.ListTopics(context.Background(), utils.KafkaDefaultTopic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !topics.Has(utils.KafkaDefaultTopic) {
 		t.Fatal("expected topic named cgrates to exist")
 	}
 
-	if err := conn.DeleteTopics(utils.KafkaDefaultTopic); err != nil {
+	if _, err := adm2.DeleteTopics(context.Background(), utils.KafkaDefaultTopic); err != nil {
 		t.Fatal(err)
 	}
 
-	experr := `[3] Unknown Topic Or Partition: the request is for a topic or partition that does not exist on this broker`
-	_, err = conn.ReadPartitions(utils.KafkaDefaultTopic)
-	if err == nil || err.Error() != experr {
-		t.Errorf("expected: <%+v>, \nreceived: <%+v>", experr, err)
+	topics, err = adm2.ListTopics(context.Background(), utils.KafkaDefaultTopic)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if topics.Has(utils.KafkaDefaultTopic) {
+		t.Error("expected topic to be deleted")
 	}
 }

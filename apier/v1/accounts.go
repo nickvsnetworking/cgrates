@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package v1
 
@@ -505,7 +490,7 @@ func (apierSv1 *APIerSv1) modifyBalance(aType string, attr *AttrAddBalance, repl
 		}}
 	}
 	at.SetActions(acts)
-	if err := at.Execute(apierSv1.FilterS, utils.ApierS); err != nil {
+	if err := at.Execute(apierSv1.FilterS, utils.ApierS, nil); err != nil {
 		return err
 	}
 	*reply = utils.OK
@@ -583,7 +568,7 @@ func (apierSv1 *APIerSv1) SetBalance(ctx *context.Context, attr *utils.AttrSetBa
 		}}
 	}
 	at.SetActions(acts)
-	if err = at.Execute(apierSv1.FilterS, utils.ApierS); err != nil {
+	if err = at.Execute(apierSv1.FilterS, utils.ApierS, nil); err != nil {
 		return
 	}
 	*reply = utils.OK
@@ -665,7 +650,7 @@ func (apierSv1 *APIerSv1) SetBalances(ctx *context.Context, attr *utils.AttrSetB
 			}}
 		}
 		at.SetActions(acts)
-		if err = at.Execute(apierSv1.FilterS, utils.ApierS); err != nil {
+		if err = at.Execute(apierSv1.FilterS, utils.ApierS, nil); err != nil {
 			return
 		}
 	}
@@ -705,7 +690,7 @@ func (apierSv1 *APIerSv1) RemoveBalances(ctx *context.Context, attr *utils.AttrS
 		Balance:    balance,
 	}
 	at.SetActions(engine.Actions{a})
-	if err := at.Execute(apierSv1.FilterS, utils.ApierS); err != nil {
+	if err := at.Execute(apierSv1.FilterS, utils.ApierS, nil); err != nil {
 		*reply = err.Error()
 		return err
 	}
@@ -765,7 +750,7 @@ func (apierSv1 *APIerSv1) TransferBalance(ctx *context.Context, attr utils.AttrT
 	at := &engine.ActionTiming{}
 	at.SetActions(actions)
 	at.SetAccountIDs(utils.StringMap{utils.ConcatenatedKey(attr.Tenant, attr.SourceAccountID): true})
-	if err = at.Execute(apierSv1.FilterS, utils.ApierS); err != nil {
+	if err = at.Execute(apierSv1.FilterS, utils.ApierS, nil); err != nil {
 		return utils.NewErrServerError(err)
 	}
 	return nil
@@ -782,4 +767,26 @@ func (apierSv1 *APIerSv1) GetAccountsCount(ctx *context.Context, attr *utils.Ten
 	}
 	*reply = len(accountKeys)
 	return
+}
+
+// GetAccountIDs returns list of account IDs registered for a tenant.
+func (apierSv1 *APIerSv1) GetAccountIDs(ctx *context.Context, args *utils.PaginatorWithTenant, accIDs *[]string) error {
+	tnt := args.Tenant
+	if tnt == "" {
+		tnt = apierSv1.Config.GeneralCfg().DefaultTenant
+	}
+	prfx := utils.AccountPrefix + tnt + utils.ConcatenatedKeySep
+	keys, err := apierSv1.DataManager.DataDB().GetKeysForPrefix(prfx, args.Search)
+	if err != nil {
+		return err
+	}
+	if len(keys) == 0 {
+		return utils.ErrNotFound
+	}
+	retIDs := make([]string, len(keys))
+	for i, key := range keys {
+		retIDs[i] = key[len(prfx):]
+	}
+	*accIDs = args.PaginateStringSlice(retIDs)
+	return nil
 }

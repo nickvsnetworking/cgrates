@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package engine
 
@@ -68,7 +53,7 @@ func TestCMgetConnUnsupportedBiRPC(t *testing.T) {
 		rpcInternal: map[string]chan birpc.ClientConnector{
 			connID: cc,
 		},
-		connCache: ltcache.NewCache(-1, 0, true, true, nil),
+		connCache: ltcache.NewCache(-1, 0, true, true, nil, nil),
 	}
 
 	experr := rpcclient.ErrUnsupportedBiRPC
@@ -113,7 +98,7 @@ func TestCMgetConnNotInternalRPC(t *testing.T) {
 		rpcInternal: map[string]chan birpc.ClientConnector{
 			"testString": cc,
 		},
-		connCache: ltcache.NewCache(-1, 0, true, true, nil),
+		connCache: ltcache.NewCache(-1, 0, true, true, nil, nil),
 	}
 
 	cM.connCache.Set(connID, nil, nil)
@@ -162,7 +147,7 @@ func TestCMgetConnWithConfigUnsupportedTransport(t *testing.T) {
 		rpcInternal: map[string]chan birpc.ClientConnector{
 			connID: cc,
 		},
-		connCache: ltcache.NewCache(-1, 0, true, true, nil),
+		connCache: ltcache.NewCache(-1, 0, true, true, nil, nil),
 	}
 
 	experr := fmt.Sprintf("Unsupported transport: <%+s>", "invalid")
@@ -196,7 +181,7 @@ func TestCMgetConnWithConfigUnsupportedCodec(t *testing.T) {
 		rpcInternal: map[string]chan birpc.ClientConnector{
 			connID: cc,
 		},
-		connCache: ltcache.NewCache(-1, 0, true, true, nil),
+		connCache: ltcache.NewCache(-1, 0, true, true, nil, nil),
 	}
 
 	experr := rpcclient.ErrUnsupportedCodec
@@ -231,7 +216,7 @@ func TestCMgetConnWithConfigEmptyTransport(t *testing.T) {
 		rpcInternal: map[string]chan birpc.ClientConnector{
 			connID: cc,
 		},
-		connCache: ltcache.NewCache(-1, 0, true, true, nil),
+		connCache: ltcache.NewCache(-1, 0, true, true, nil, nil),
 	}
 
 	cM.connCache.Set(connID, nil, nil)
@@ -273,7 +258,7 @@ func TestCMgetConnWithConfigInternalRPCCodec(t *testing.T) {
 		rpcInternal: map[string]chan birpc.ClientConnector{
 			connID: cc,
 		},
-		connCache: ltcache.NewCache(-1, 0, true, true, nil),
+		connCache: ltcache.NewCache(-1, 0, true, true, nil, nil),
 	}
 
 	rcv, err := cM.getConnWithConfig(context.Background(), connID, cfg.RPCConns()[connID], cc)
@@ -305,7 +290,7 @@ func TestCMgetConnWithConfigInternalBiRPCCodecUnsupported(t *testing.T) {
 		rpcInternal: map[string]chan birpc.ClientConnector{
 			connID: cc,
 		},
-		connCache: ltcache.NewCache(-1, 0, true, true, nil),
+		connCache: ltcache.NewCache(-1, 0, true, true, nil, nil),
 	}
 
 	experr := rpcclient.ErrUnsupportedCodec
@@ -415,7 +400,7 @@ func TestCMCallWithConnIDsInternallyDCed(t *testing.T) {
 
 	cM := &ConnManager{
 		cfg:       cfg,
-		connCache: ltcache.NewCache(-1, 0, true, true, nil),
+		connCache: ltcache.NewCache(-1, 0, true, true, nil, nil),
 	}
 	subsHostIDs := utils.StringSet{
 		connID: struct{}{},
@@ -451,7 +436,7 @@ func TestCMCallWithConnIDs2(t *testing.T) {
 
 	cM := &ConnManager{
 		cfg:       cfg,
-		connCache: ltcache.NewCache(-1, 0, true, true, nil),
+		connCache: ltcache.NewCache(-1, 0, true, true, nil, nil),
 	}
 
 	cM.connCache.Set(poolID+utils.ConcatenatedKeySep+connID, ccM, nil)
@@ -473,7 +458,7 @@ func TestCMReload(t *testing.T) {
 
 	cM := &ConnManager{
 		cfg:       cfg,
-		connCache: ltcache.NewCache(-1, 0, true, true, nil),
+		connCache: ltcache.NewCache(-1, 0, true, true, nil, nil),
 	}
 	cM.connCache.Set("itmID1", "value of first item", nil)
 

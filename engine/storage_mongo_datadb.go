@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package engine
 
@@ -394,12 +379,6 @@ func (ms *MongoStorage) Flush(_ string) (err error) {
 // DB returns the database object associated with the MongoDB client.
 func (ms *MongoStorage) DB() *mongo.Database {
 	return ms.client.Database(ms.db)
-}
-
-// SelectDatabase selects the specified database.
-func (ms *MongoStorage) SelectDatabase(dbName string) error {
-	ms.db = dbName
-	return nil
 }
 
 func (ms *MongoStorage) RemoveKeysForPrefix(prefix string) error {
@@ -1084,19 +1063,6 @@ func (ms *MongoStorage) GetAccountDrv(key string) (*Account, error) {
 }
 
 func (ms *MongoStorage) SetAccountDrv(acc *Account) error {
-	// never override existing account with an empty one
-	// UPDATE: if all balances expired and were cleaned it makes
-	// sense to write empty balance map
-	if len(acc.BalanceMap) == 0 {
-		ac, err := ms.GetAccountDrv(acc.ID)
-		if err == nil && !ac.allBalancesExpired() {
-			ac.ActionTriggers = acc.ActionTriggers
-			ac.UnitCounters = acc.UnitCounters
-			ac.AllowNegative = acc.AllowNegative
-			ac.Disabled = acc.Disabled
-			acc = ac
-		}
-	}
 	acc.UpdateTime = time.Now()
 	return ms.query(func(sctx mongo.SessionContext) error {
 		_, err := ms.getCol(ColAcc).UpdateOne(sctx, bson.M{"id": acc.ID},
@@ -2190,22 +2156,31 @@ func (ms *MongoStorage) SetIndexesDrv(idxItmType, tntCtx string,
 			return err
 		}
 	}
+	deleteKeys := make([]string, 0, len(indexes))
 	var lastErr error
-	for idxKey, itmMp := range indexes {
-		err := ms.query(func(sctx mongo.SessionContext) (qryErr error) {
-			idxDbkey := utils.ConcatenatedKey(dbKey, idxKey)
-			if len(itmMp) == 0 { // remove from DB if we set it with empty indexes
-				_, qryErr = ms.getCol(ColIndx).DeleteOne(sctx,
-					bson.M{"key": idxDbkey})
-			} else {
-				_, qryErr = ms.getCol(ColIndx).UpdateOne(sctx, bson.M{"key": idxDbkey},
-					bson.M{"$set": bson.M{"key": idxDbkey, "value": itmMp.AsSlice()}},
-					options.Update().SetUpsert(true),
-				)
-			}
+	for idxKey, index := range indexes {
+		indexKey := utils.ConcatenatedKey(dbKey, idxKey)
+		if len(index) == 0 {
+			deleteKeys = append(deleteKeys, indexKey)
+			continue
+		}
+		if err := ms.query(func(sctx mongo.SessionContext) error {
+			_, qryErr := ms.getCol(ColIndx).UpdateOne(sctx, bson.M{"key": indexKey},
+				bson.M{"$set": bson.M{"key": indexKey, "value": index.AsSlice()}},
+				options.Update().SetUpsert(true),
+			)
 			return qryErr
-		})
-		if err != nil {
+		}); err != nil {
+			lastErr = err
+		}
+	}
+	if len(deleteKeys) != 0 {
+		if err := ms.query(func(sctx mongo.SessionContext) error {
+			_, qryErr := ms.getCol(ColIndx).DeleteMany(sctx, bson.M{
+				"key": bson.M{"$in": deleteKeys},
+			})
+			return qryErr
+		}); err != nil {
 			lastErr = err
 		}
 	}
@@ -2372,5 +2347,15 @@ func (ms *MongoStorage) RewriteDataDB() (err error) {
 
 // BackupDataDB only for InternalDB
 func (ms *MongoStorage) BackupDataDB(backupFolderPath string, zip bool) (err error) {
+	return utils.ErrNotImplemented
+}
+
+// RestoreDataDB only for InternalDB
+func (ms *MongoStorage) RestoreDataDB(backupFolderPath string) (err error) {
+	return utils.ErrNotImplemented
+}
+
+// SnapshotDataDB only for InternalDB
+func (ms *MongoStorage) SnapshotDataDB(backupFolderPath string, zip bool) (err error) {
 	return utils.ErrNotImplemented
 }

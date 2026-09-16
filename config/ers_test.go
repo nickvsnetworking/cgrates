@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package config
 
 import (
@@ -41,7 +27,9 @@ func TestERSClone(t *testing.T) {
 			"flags": ["*dryrun"],
 			"source_path": "/tmp/ers/in",
 			"processed_path": "/tmp/ers/out",
-			"opts": {},
+			"opts": {
+				"xmlRootPath": "A.B"
+			},
 			"tenant": "~*req.Destination1",											
 			"timezone": "",										
 			"filters": ["randomFiletrs"],										
@@ -109,7 +97,6 @@ func TestERSClone(t *testing.T) {
 				},
 				CacheDumpFields:     make([]*FCTemplate, 0),
 				PartialCommitFields: make([]*FCTemplate, 0),
-				EEsIDs:              []string{},
 				EEsSuccessIDs:       []string{},
 				EEsFailedIDs:        []string{},
 				Opts: &EventReaderOpts{
@@ -153,7 +140,6 @@ func TestERSClone(t *testing.T) {
 						Value: NewRSRParsersMustCompile("~*req.2", utils.InfieldSep), Mandatory: true, Layout: time.RFC3339},
 				},
 				PartialCommitFields: make([]*FCTemplate, 0),
-				EEsIDs:              []string{},
 				EEsSuccessIDs:       []string{},
 				EEsFailedIDs:        []string{},
 				Opts: &EventReaderOpts{
@@ -166,6 +152,7 @@ func TestERSClone(t *testing.T) {
 					AWS:                &AWSROpts{},
 					SQL:                &SQLROpts{},
 					Kafka:              &KafkaROpts{},
+					XMLRootPath:        utils.StringPointer("A.B"),
 					PartialOrderField:  utils.StringPointer("~*req.AnswerTime"),
 					PartialCacheAction: utils.StringPointer(utils.MetaNone),
 					NATS: &NATSROpts{
@@ -224,6 +211,39 @@ func TestEventReaderloadFromJsonCase1(t *testing.T) {
 	if err := jsoncfg.ersCfg.loadFromJSONCfg(cfgJson, jsoncfg.templates, jsoncfg.generalCfg.RSRSep, jsoncfg.dfltEvRdr); err == nil {
 		t.Error(err)
 	}
+
+	cfgJSON2 := &ERsJsonCfg{
+		Readers: &[]*EventReaderJsonCfg{
+			{
+				Start_delay: utils.StringPointer("1ss"),
+			},
+		},
+	}
+	expectedErr := `time: unknown unit "ss" in duration "1ss"`
+	if err := jsoncfg.ersCfg.loadFromJSONCfg(cfgJSON2, jsoncfg.templates, jsoncfg.generalCfg.RSRSep, jsoncfg.dfltEvRdr); err == nil || err.Error() != expectedErr {
+		t.Errorf("Expected %v, recieved %v", expectedErr, err)
+	}
+
+	cfgJSON3 := &ERsJsonCfg{
+		Readers: &[]*EventReaderJsonCfg{
+			{
+				Max_reconnect_interval: utils.StringPointer("1ss"),
+			},
+		},
+	}
+	expectedErr = `time: unknown unit "ss" in duration "1ss"`
+	if err := jsoncfg.ersCfg.loadFromJSONCfg(cfgJSON3, jsoncfg.templates, jsoncfg.generalCfg.RSRSep, jsoncfg.dfltEvRdr); err == nil || err.Error() != expectedErr {
+		t.Errorf("Expected %v, recieved %v", expectedErr, err)
+	}
+	er := &EventReaderCfg{
+		StartDelay: 2 * time.Second,
+		Opts:       &EventReaderOpts{},
+	}
+	rcv := er.AsMapInterface(utils.InInFieldSep)
+	if rcv[utils.StartDelayCfg] != "2s" {
+		t.Errorf("Expected StartDelay = 2s, got %v", rcv[utils.StartDelayCfg])
+	}
+
 }
 
 func TestEventReaderloadFromJsonCase3(t *testing.T) {
@@ -289,7 +309,6 @@ func TestERSLoadFromjsonCfg(t *testing.T) {
 				},
 				CacheDumpFields:     make([]*FCTemplate, 0),
 				PartialCommitFields: make([]*FCTemplate, 0),
-				EEsIDs:              []string{},
 				EEsSuccessIDs:       []string{},
 				EEsFailedIDs:        []string{},
 				Opts: &EventReaderOpts{
@@ -348,7 +367,6 @@ func TestERSLoadFromjsonCfg(t *testing.T) {
 				},
 				CacheDumpFields:     make([]*FCTemplate, 0),
 				PartialCommitFields: make([]*FCTemplate, 0),
-				EEsIDs:              []string{},
 				EEsSuccessIDs:       []string{},
 				EEsFailedIDs:        []string{},
 				Opts: &EventReaderOpts{
@@ -552,7 +570,6 @@ func TestERSloadFromJsonCase3(t *testing.T) {
 				},
 				CacheDumpFields:     make([]*FCTemplate, 0),
 				PartialCommitFields: make([]*FCTemplate, 0),
-				EEsIDs:              []string{},
 				EEsSuccessIDs:       []string{},
 				EEsFailedIDs:        []string{},
 				Opts: &EventReaderOpts{
@@ -595,7 +612,6 @@ func TestERSloadFromJsonCase3(t *testing.T) {
 				PartialCommitFields:  make([]*FCTemplate, 0),
 				Reconnects:           5,
 				MaxReconnectInterval: 3 * time.Minute,
-				EEsIDs:               []string{},
 				EEsSuccessIDs:        []string{},
 				EEsFailedIDs:         []string{},
 				Opts: &EventReaderOpts{
@@ -717,7 +733,6 @@ func TestERSloadFromJsonCase4(t *testing.T) {
 				},
 				CacheDumpFields:     make([]*FCTemplate, 0),
 				PartialCommitFields: make([]*FCTemplate, 0),
-				EEsIDs:              []string{},
 				EEsSuccessIDs:       []string{},
 				EEsFailedIDs:        []string{},
 				Opts: &EventReaderOpts{
@@ -749,7 +764,6 @@ func TestERSloadFromJsonCase4(t *testing.T) {
 				Filters:        []string{},
 				Flags:          utils.FlagsWithParams{},
 				Fields:         []*FCTemplate{},
-				EEsIDs:         []string{},
 				EEsSuccessIDs:  []string{},
 				EEsFailedIDs:   []string{},
 				CacheDumpFields: []*FCTemplate{
@@ -808,6 +822,53 @@ func TestERSloadFromJsonCase4(t *testing.T) {
 	}
 }
 
+func TestERsLoadFromJsonCase5(t *testing.T) {
+
+	cfgJSON := &ERsJsonCfg{
+		Readers: &[]*EventReaderJsonCfg{
+			{
+				Partial_commit_fields: &[]*FcTemplateJsonCfg{
+					{
+						Type:  utils.StringPointer(utils.MetaTemplate),
+						Value: utils.StringPointer("templ"),
+					},
+				},
+			},
+		},
+	}
+
+	msgTemplates := map[string][]*FCTemplate{
+		"templ": {
+			{
+				Tag: utils.CGRID, Path: "*exp.CGRID", Type: utils.MetaVariable, Layout: time.RFC3339,
+			},
+		},
+	}
+
+	jsonCfg := NewDefaultCGRConfig()
+	if err := jsonCfg.ersCfg.loadFromJSONCfg(cfgJSON, msgTemplates, jsonCfg.generalCfg.RSRSep, jsonCfg.dfltEvRdr); err != nil {
+		t.Error(err)
+	}
+
+	cfgJSONErr := &ERsJsonCfg{
+		Readers: &[]*EventReaderJsonCfg{
+			{
+				Partial_commit_fields: &[]*FcTemplateJsonCfg{
+					{
+						Type: utils.StringPointer(utils.MetaTemplate),
+					},
+				},
+			},
+		},
+	}
+
+	expected := "no template with id: <>"
+	if err := jsonCfg.ersCfg.loadFromJSONCfg(cfgJSONErr, msgTemplates, jsonCfg.generalCfg.RSRSep, jsonCfg.dfltEvRdr); err == nil || err.Error() != expected {
+		t.Errorf("Expected %v, recieved %v", expected, err)
+	}
+
+}
+
 func TestEventReaderCacheDumpFieldsloadFromJsonCfg(t *testing.T) {
 	cfgJSON := &ERsJsonCfg{
 		Readers: &[]*EventReaderJsonCfg{
@@ -849,7 +910,6 @@ func TestEventReaderSameID(t *testing.T) {
 				Flags:                utils.FlagsWithParams{},
 				Reconnects:           -1,
 				MaxReconnectInterval: 5 * time.Minute,
-				EEsIDs:               []string{},
 				EEsSuccessIDs:        []string{},
 				EEsFailedIDs:         []string{},
 				Fields: []*FCTemplate{
@@ -906,7 +966,6 @@ func TestEventReaderSameID(t *testing.T) {
 				Timezone:       utils.EmptyString,
 				Filters:        []string{},
 				Flags:          utils.FlagsWithParams{},
-				EEsIDs:         []string{},
 				EEsSuccessIDs:  []string{},
 				EEsFailedIDs:   []string{},
 				Fields: []*FCTemplate{
@@ -1286,6 +1345,59 @@ func TestERSCfgAsMapInterfaceCase2(t *testing.T) {
 	}
 }
 
+func TestEventReaderCfgAsMapInterfaceCase3(t *testing.T) {
+	er := &EventReaderCfg{
+		EEsSuccessIDs: []string{"eesTest"},
+		EEsFailedIDs:  []string{"eesFail"},
+		PartialCommitFields: []*FCTemplate{
+			{
+				Tag: "tag1", Path: "path1", Type: utils.MetaVariable, Layout: time.RFC3339,
+			},
+		},
+
+		Opts: &EventReaderOpts{
+			CSV:  &CSVROpts{},
+			AMQP: &AMQPROpts{},
+			AWS:  &AWSROpts{},
+			NATS: &NATSROpts{},
+			SQL: &SQLROpts{
+				BatchSize:           utils.IntPointer(10),
+				DeleteIndexedFields: utils.SliceStringPointer([]string{"id"}),
+			},
+			Kafka: &KafkaROpts{
+				TLS:           utils.BoolPointer(true),
+				CAPath:        utils.StringPointer("path"),
+				SkipTLSVerify: utils.BoolPointer(false),
+			},
+		},
+	}
+	rcv := er.AsMapInterface(utils.InInFieldSep)
+
+	opts := rcv[utils.OptsCfg].(map[string]any)
+	if opts[utils.KafkaTLS] != true {
+		t.Errorf("Expected KafkaTLS = true")
+	}
+	if opts[utils.KafkaCAPath] != "path" {
+		t.Errorf("Expected KafkaCAPath = path")
+	}
+	if opts[utils.KafkaSkipTLSVerify] != false {
+		t.Errorf("Expected KafkaSkipTLSVerify = false")
+	}
+	if opts[utils.SQLBatchSize] != 10 {
+		t.Errorf("Expected SQLBatchSize = 10")
+	}
+	if rcv[utils.EEsSuccessIDsCfg] == nil {
+		t.Errorf("Expected EEsSuccessIDsCfg to be set")
+	}
+	if rcv[utils.EEsFailedIDsCfg] == nil {
+		t.Errorf("Expected EEsFailedIDsCfg to be set")
+	}
+	if rcv[utils.PartialCommitFieldsCfg] == nil {
+		t.Errorf("Expected PartialCommitFieldsCfg to be set")
+	}
+
+}
+
 func TestERsloadFromJsonCfg(t *testing.T) {
 	cfgJSON := &ERsJsonCfg{
 		Enabled:       utils.BoolPointer(true),
@@ -1338,7 +1450,6 @@ func TestERsloadFromJsonCfg(t *testing.T) {
 				Flags:                utils.FlagsWithParams{},
 				Reconnects:           -1,
 				MaxReconnectInterval: 5 * time.Minute,
-				EEsIDs:               []string{},
 				EEsSuccessIDs:        []string{},
 				EEsFailedIDs:         []string{},
 				Fields: []*FCTemplate{
@@ -1397,7 +1508,6 @@ func TestERsloadFromJsonCfg(t *testing.T) {
 				Flags:                utils.FlagsWithParams{},
 				Reconnects:           -1,
 				MaxReconnectInterval: 5 * time.Minute,
-				EEsIDs:               []string{},
 				EEsSuccessIDs:        []string{},
 				EEsFailedIDs:         []string{},
 				Fields: []*FCTemplate{
@@ -1454,6 +1564,7 @@ func TestEventReaderOptsCfg(t *testing.T) {
 	}
 	eventReaderOptsJson := &EventReaderOptsJson{
 		PartialPath:              utils.StringPointer("path"),
+		IgnoreErroredItems:       utils.BoolPointer(true),
 		PartialCSVFieldSeparator: utils.StringPointer("/"),
 		CSVLazyQuotes:            utils.BoolPointer(false),
 		AMQPQueueID:              utils.StringPointer("id"),
@@ -1463,6 +1574,9 @@ func TestEventReaderOptsCfg(t *testing.T) {
 		AMQPRoutingKey:           utils.StringPointer("key1"),
 		KafkaTopic:               utils.StringPointer("kafka"),
 		KafkaMaxWait:             utils.StringPointer("1m"),
+		KafkaTLS:                 utils.BoolPointer(false),
+		KafkaCAPath:              utils.StringPointer("path"),
+		KafkaSkipTLSVerify:       utils.BoolPointer(true),
 		SQLDBName:                utils.StringPointer("dbname"),
 		SQLTableName:             utils.StringPointer("tablename"),
 		SQLBatchSize:             utils.IntPointer(-1),
@@ -1511,79 +1625,123 @@ func TestEventReaderOptsCfg(t *testing.T) {
 }
 
 func TestEventReaderCfgClone(t *testing.T) {
-	ban := &EventReaderCfg{
-		ID:             "2",
-		Type:           "type",
-		RunDelay:       1 * time.Minute,
-		ConcurrentReqs: 5,
-		PartialCommitFields: []*FCTemplate{
-			{
-				Tag:  "tag1",
-				Type: "type1",
-			},
-			{
-				Tag:  "tag2",
-				Type: "type2",
+	tests := []struct {
+		name  string
+		erCfg *EventReaderCfg
+	}{
+		{
+			name: "Complete EventReaderCfg",
+			erCfg: &EventReaderCfg{
+				ID:             "2",
+				Type:           "type",
+				RunDelay:       1 * time.Minute,
+				ConcurrentReqs: 5,
+				PartialCommitFields: []*FCTemplate{
+					{
+						Tag:  "tag1",
+						Type: "type1",
+					},
+					{
+						Tag:  "tag2",
+						Type: "type2",
+					},
+				},
+				SourcePath:    "/",
+				ProcessedPath: "/path",
+				Tenant:        RSRParsers{},
+				Timezone:      "time.Utc",
+				Flags:         utils.FlagsWithParams{},
+				Opts: &EventReaderOpts{
+					PartialPath: utils.StringPointer("path"),
+					CSV: &CSVROpts{
+						PartialCSVFieldSeparator: utils.StringPointer("/"),
+						LazyQuotes:               utils.BoolPointer(false),
+					},
+					AMQP: &AMQPROpts{
+						QueueID:      utils.StringPointer("id"),
+						ConsumerTag:  utils.StringPointer("tag"),
+						Exchange:     utils.StringPointer("exchange"),
+						ExchangeType: utils.StringPointer("type"),
+						RoutingKey:   utils.StringPointer("key1"),
+					},
+					SQL: &SQLROpts{
+						DBName:              utils.StringPointer("dbname"),
+						TableName:           utils.StringPointer("tablename"),
+						BatchSize:           utils.IntPointer(0),
+						DeleteIndexedFields: utils.SliceStringPointer([]string{"id"}),
+						PgSSLMode:           utils.StringPointer("sslmode"),
+					},
+					AWS: &AWSROpts{
+
+						Region:     utils.StringPointer("eu"),
+						Key:        utils.StringPointer("key"),
+						Secret:     utils.StringPointer("secret"),
+						Token:      utils.StringPointer("token"),
+						SQSQueueID: utils.StringPointer("SQSQueue"),
+						S3BucketID: utils.StringPointer("S3BucketID"),
+					},
+					NATS: &NATSROpts{
+						JetStream:            utils.BoolPointer(false),
+						ConsumerName:         utils.StringPointer("user"),
+						StreamName:           utils.StringPointer("stream"),
+						QueueID:              utils.StringPointer("id"),
+						JWTFile:              utils.StringPointer("jwt"),
+						SeedFile:             utils.StringPointer("seed"),
+						CertificateAuthority: utils.StringPointer("authority"),
+						ClientCertificate:    utils.StringPointer("certificate"),
+						ClientKey:            utils.StringPointer("key5"),
+						JetStreamMaxWait:     utils.DurationPointer(1 * time.Minute),
+					},
+					Kafka: &KafkaROpts{
+						Topic:   utils.StringPointer("kafka"),
+						MaxWait: utils.DurationPointer(1 * time.Minute),
+						GroupID: utils.StringPointer("groupId"),
+					},
+				},
 			},
 		},
-		SourcePath:    "/",
-		ProcessedPath: "/path",
-		Tenant:        RSRParsers{},
-		Timezone:      "time.Utc",
-		Flags:         utils.FlagsWithParams{},
-		Opts: &EventReaderOpts{
-			PartialPath: utils.StringPointer("path"),
-			CSV: &CSVROpts{
-				PartialCSVFieldSeparator: utils.StringPointer("/"),
-				LazyQuotes:               utils.BoolPointer(false),
-			},
-			AMQP: &AMQPROpts{
-				QueueID:      utils.StringPointer("id"),
-				ConsumerTag:  utils.StringPointer("tag"),
-				Exchange:     utils.StringPointer("exchange"),
-				ExchangeType: utils.StringPointer("type"),
-				RoutingKey:   utils.StringPointer("key1"),
-			},
-			SQL: &SQLROpts{
-				DBName:              utils.StringPointer("dbname"),
-				TableName:           utils.StringPointer("tablename"),
-				BatchSize:           utils.IntPointer(0),
-				DeleteIndexedFields: utils.SliceStringPointer([]string{"id"}),
-				PgSSLMode:           utils.StringPointer("sslmode"),
-			},
-			AWS: &AWSROpts{
-
-				Region:     utils.StringPointer("eu"),
-				Key:        utils.StringPointer("key"),
-				Secret:     utils.StringPointer("secret"),
-				Token:      utils.StringPointer("token"),
-				SQSQueueID: utils.StringPointer("SQSQueue"),
-				S3BucketID: utils.StringPointer("S3BucketID"),
-			},
-			NATS: &NATSROpts{
-				JetStream:            utils.BoolPointer(false),
-				ConsumerName:         utils.StringPointer("user"),
-				StreamName:           utils.StringPointer("stream"),
-				QueueID:              utils.StringPointer("id"),
-				JWTFile:              utils.StringPointer("jwt"),
-				SeedFile:             utils.StringPointer("seed"),
-				CertificateAuthority: utils.StringPointer("authority"),
-				ClientCertificate:    utils.StringPointer("certificate"),
-				ClientKey:            utils.StringPointer("key5"),
-				JetStreamMaxWait:     utils.DurationPointer(1 * time.Minute),
-			},
-			Kafka: &KafkaROpts{
-				Topic:   utils.StringPointer("kafka"),
-				MaxWait: utils.DurationPointer(1 * time.Minute),
-				GroupID: utils.StringPointer("groupId"),
+		{
+			name: "Nil Opts",
+			erCfg: &EventReaderCfg{
+				ID:             "2",
+				Type:           "type",
+				RunDelay:       1 * time.Minute,
+				ConcurrentReqs: 5,
+				PartialCommitFields: []*FCTemplate{
+					{
+						Tag:  "tag1",
+						Type: "type1",
+					},
+					{
+						Tag:  "tag2",
+						Type: "type2",
+					},
+				},
+				SourcePath:    "/",
+				ProcessedPath: "/path",
+				Tenant:        RSRParsers{},
+				Timezone:      "time.Utc",
+				Flags:         utils.FlagsWithParams{},
+				Opts:          nil,
 			},
 		},
+		{
+			name:  "Nil EventReaderCfg",
+			erCfg: nil,
+		},
 	}
-	rcv := ban.Clone()
-	if !reflect.DeepEqual(rcv, ban) {
-		t.Errorf("expected %v received %v", utils.ToJSON(ban), utils.ToJSON(rcv))
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rcv := tt.erCfg.Clone()
+			if !reflect.DeepEqual(rcv, tt.erCfg) {
+				t.Errorf("expected %v received %v", utils.ToJSON(tt.erCfg), utils.ToJSON(rcv))
+			}
 
+			if rcv != nil && rcv == tt.erCfg {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+	}
 }
 
 func TestEventReaderCfgloadFromJSONCfg(t *testing.T) {

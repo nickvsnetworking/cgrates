@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package utils
 
 import (
@@ -205,7 +191,7 @@ func TestOrderedNavigableMapField(t *testing.T) {
 	if val, err := nm.Field([]string{"Field5", "0"}); err != nil {
 		t.Error(err)
 	} else if val.Data != 10 {
-		t.Errorf("Expected %q ,received: %q", 10, val.Data)
+		t.Errorf("Expected %v ,received: %v", 10, val.Data)
 	}
 	if _, err := nm.Field([]string{"Field3", "0"}); err != ErrNotFound {
 		t.Error(err)
@@ -269,14 +255,14 @@ func TestOrderedNavigableMapGetSet(t *testing.T) {
 	if val, err := nm.Field(path); err != nil {
 		t.Error(err)
 	} else if val.Data != 10 {
-		t.Errorf("Expected %q ,received: %q", 10, val.Data)
+		t.Errorf("Expected %v ,received: %v", 10, val.Data)
 	}
 
 	path = []string{"Field3", "Field4", "Field5"}
 	if val, err := nm.Field(path); err != nil {
 		t.Error(err)
 	} else if val.Data != 5 {
-		t.Errorf("Expected %q ,received: %q", 5, val.Data)
+		t.Errorf("Expected %v ,received: %v", 5, val.Data)
 	}
 
 	path = []string{"Field2", "2"}
@@ -322,7 +308,7 @@ func TestOrderedNavigableMapFieldAsInterface(t *testing.T) {
 	if val, err := nm.FieldAsInterface([]string{"Field5[0]"}); err != nil {
 		t.Error(err)
 	} else if val != 10 {
-		t.Errorf("Expected %q ,received: %q", 10, val)
+		t.Errorf("Expected %v ,received: %v", 10, val)
 	}
 }
 
@@ -343,7 +329,7 @@ func TestOrderedNavigableMapFieldAsString(t *testing.T) {
 	if val, err := nm.FieldAsString([]string{"Field5[0]"}); err != nil {
 		t.Error(err)
 	} else if val != "10" {
-		t.Errorf("Expected %q ,received: %q", 10, val)
+		t.Errorf("Expected %v ,received: %v", 10, val)
 	}
 }
 
@@ -635,6 +621,26 @@ func TestOrderedNavigableMapRemove(t *testing.T) {
 	if err := nm.Remove(&FullPath{PathSlice: []string{"Field1", "0", ""}}); err != ErrWrongPath {
 		t.Error(err)
 	}
+
+	nm.Set(
+		&FullPath{
+			PathSlice: []string{"Field"},
+			Path:      "Field"},
+		NewLeafNode("v1"),
+	)
+	nm.Set(
+		&FullPath{
+			PathSlice: []string{"Field1"},
+			Path:      "Field1"},
+		NewLeafNode("v2"),
+	)
+	if err := nm.Remove(&FullPath{PathSlice: []string{"Field"}, Path: "Field"}); err != nil {
+		t.Error(err)
+	}
+	if _, err := nm.Field([]string{"Field1"}); err != nil {
+		t.Errorf("Field1 should still exist after removing Field, recieved err: %v", err)
+	}
+
 }
 
 /*
@@ -933,8 +939,34 @@ func TestOrderedNavigableMapAppend(t *testing.T) {
 	if err := onm.Append(&FullPath{
 		PathSlice: []string{"Field1", "Field2", "0"},
 		Path:      "Field1.Field2[0]",
-	}, &DataLeaf{Data: "dataTest"}); err == nil || err != ErrWrongPath {
-		t.Errorf("Expected %v but received %v", ErrWrongPath, err)
+	}, &DataLeaf{Data: "dataTest"}); err != nil {
+		t.Errorf("Expected no error but received %v", err)
+	}
+
+	onmErr := NewOrderedNavigableMap()
+	onmErr.Set(&FullPath{
+		PathSlice: []string{"Field1"},
+		Path:      "Field1",
+	}, NewLeafNode("dataTest"))
+
+	if err := onm.Append(&FullPath{
+		PathSlice: []string{"Field1"},
+		Path:      "Field1",
+	}, &DataLeaf{Data: "dataTest1"}); err == nil {
+		t.Errorf("Expected error but received %v", err)
+	}
+
+	onmP := NewOrderedNavigableMap()
+	onmP.Set(&FullPath{
+		PathSlice: []string{"Field1"},
+		Path:      "Field1",
+	}, NewLeafNode("dataTest"))
+
+	if err := onmErr.Append(&FullPath{
+		PathSlice: []string{"Field1"},
+		Path:      "Field1",
+	}, &DataLeaf{Data: "dataTest1"}); err != nil {
+		t.Errorf("Expected error but received %v", err)
 	}
 }
 
@@ -981,15 +1013,93 @@ func TestOrderedNavigableMapSet2(t *testing.T) {
 	}
 
 	nMap := &DataNode{Type: NMMapType, Map: map[string]*DataNode{
-		"Field1": {Type: NMSliceType, Slice: []*DataNode{NewLeafNode("1002")}},
-		"Field":  {Type: NMSliceType, Slice: []*DataNode{NewLeafNode("1001")}},
+		"Field1": NewLeafNode("1002"),
+		"Field":  NewLeafNode("1001"),
 	}}
-	order := [][]string{{"Field1", "0"}, {"Field", "0"}}
+	order := [][]string{{"Field1"}, {"Field"}}
 
 	if !reflect.DeepEqual(nm.nm, nMap) {
 		t.Errorf("Expected %s ,received: %s", ToJSON(nMap), ToJSON(nm.nm))
 	}
 	if !reflect.DeepEqual(nm.GetOrder(), order) {
 		t.Errorf("Expected %s ,received: %s", order, nm.GetOrder())
+	}
+}
+
+func TestOrderedNavigableMapAsMap(t *testing.T) {
+	onm := NewOrderedNavigableMap()
+
+	onm.Set(&FullPath{
+		PathSlice: []string{"Tenant"},
+		Path:      "Tenant",
+	}, &DataLeaf{Data: "cgrates.org"})
+
+	onm.Set(&FullPath{
+		PathSlice: []string{"billing", "Category"},
+		Path:      "billing.Category",
+	}, &DataLeaf{Data: "call"})
+
+	m := onm.AsMap()
+	if m == nil {
+		t.Fatal("want non-nil map")
+	}
+	if m["Tenant"] != "cgrates.org" {
+		t.Errorf("want %q, got %v", "cgrates.org", m["Tenant"])
+	}
+	inner, ok := m["billing"].(map[string]any)
+	if !ok {
+		t.Fatalf("want nested map for billing, got %T", m["billing"])
+	}
+	if inner["Category"] != "call" {
+		t.Errorf("want %q, got %v", "call", inner["Category"])
+	}
+
+	onm.Append(&FullPath{
+		PathSlice: []string{"Routes"},
+		Path:      "Routes",
+	}, &DataLeaf{Data: "route1"})
+	onm.Append(&FullPath{
+		PathSlice: []string{"Routes"},
+		Path:      "Routes",
+	}, &DataLeaf{Data: "route2"})
+
+	m = onm.AsMap()
+	want := []any{"route1", "route2"}
+	if !reflect.DeepEqual(m["Routes"], want) {
+		t.Errorf("want %v, got %v", want, m["Routes"])
+	}
+}
+
+func TestOrderedNavigableMapAsMapAppendPreservesArray(t *testing.T) {
+	onm := NewOrderedNavigableMap()
+	fp := &FullPath{Path: "Routes", PathSlice: []string{"Routes"}}
+
+	if err := onm.Append(fp, &DataLeaf{Data: "route1"}); err != nil {
+		t.Fatal(err)
+	}
+	m := onm.AsMap()
+	want := []any{"route1"}
+	if got, ok := m["Routes"].([]any); !ok || !reflect.DeepEqual(got, want) {
+		t.Errorf("want %v, got %v (%T)", want, m["Routes"], m["Routes"])
+	}
+
+	if err := onm.Append(fp, &DataLeaf{Data: "route2"}); err != nil {
+		t.Fatal(err)
+	}
+	m = onm.AsMap()
+	want = []any{"route1", "route2"}
+	if got := m["Routes"].([]any); !reflect.DeepEqual(got, want) {
+		t.Errorf("want %v, got %v", want, got)
+	}
+}
+
+func TestOrderedNavigableMapAsMapNonMap(t *testing.T) {
+	onm := &OrderedNavigableMap{
+		nm:       NewLeafNode("not a map"),
+		orderIdx: NewPathItemList(),
+		orderRef: make(map[string][]*PathItemElement),
+	}
+	if m := onm.AsMap(); m != nil {
+		t.Errorf("Expected nil for non-map root, got %v", m)
 	}
 }

@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package utils
 
@@ -512,6 +497,7 @@ const (
 	DispatcherHosts          = "DispatcherHosts"
 	MetaEveryMinute          = "*every_minute"
 	MetaHourly               = "*hourly"
+	MetaRecurring            = "*recurring"
 	ID                       = "ID"
 	UniqueID                 = "UniqueID"
 	Address                  = "Address"
@@ -810,6 +796,7 @@ const (
 	MetaSessionID      = "*sessionID" // used to retrieve RADIUS Access-Reqest packets of active sessions
 	JanusAdminSubProto = "janus-admin-protocol"
 
+	SLR                     = "SLR"
 	RemoteHost              = "RemoteHost"
 	Local                   = "local"
 	TCP                     = "tcp"
@@ -845,6 +832,8 @@ const (
 	MetaExport              = "*export"
 	MetaExporterID          = "*exporterID"
 	MetaTimeNow             = "*time_now"
+	MetaTimeDesc            = "*time_desc"
+	MetaTimeAsc             = "*time_asc"
 	MetaFirstEventATime     = "*first_event_atime"
 	MetaLastEventATime      = "*last_event_atime"
 	MetaEventNumber         = "*event_number"
@@ -864,7 +853,7 @@ const (
 	MetaApier               = "*apier"
 	MetaAnalyzer            = "*analyzer"
 	CGREventString          = "CGREvent"
-	MetaTextPlain           = "*text_plain"
+	MetaText                = "*text"
 	MetaIgnoreErrors        = "*ignore_errors"
 	MetaRelease             = "*release"
 	MetaAllocate            = "*allocate"
@@ -1175,6 +1164,9 @@ const (
 // MetaMetrics
 const (
 	MetaASR      = "*asr"
+	MetaSNR      = "*snr" // diameter Sy Spending Status Notification Request
+	MetaSLR      = "*slr" // diameter Sy Spending Limit Request
+	MetaSTR      = "*str" // diameter Sy Session Termination Request
 	MetaACD      = "*acd"
 	MetaTCD      = "*tcd"
 	MetaACC      = "*acc"
@@ -1295,6 +1287,7 @@ const (
 	MetaDynamicTrend              = "*dynamic_trend"
 	MetaDynamicResource           = "*dynamic_resource"
 	MetaDynamicActionTrigger      = "*dynamic_action_trigger"
+	MetaSyPublish                 = "*sy_publish"
 	ActionID                      = "ActionID"
 	ActionType                    = "ActionType"
 	ActionValue                   = "ActionValue"
@@ -1619,6 +1612,7 @@ const (
 	APIerSv1DebitBalance                      = "APIerSv1.DebitBalance"
 	APIerSv1SetAccount                        = "APIerSv1.SetAccount"
 	APIerSv1GetAccountsCount                  = "APIerSv1.GetAccountsCount"
+	APIerSv1GetAccountIDs                     = "APIerSv1.GetAccountIDs"
 	APIerSv1GetDataDBVersions                 = "APIerSv1.GetDataDBVersions"
 	APIerSv1GetStorDBVersions                 = "APIerSv1.GetStorDBVersions"
 	APIerSv1GetCDRs                           = "APIerSv1.GetCDRs"
@@ -1729,6 +1723,7 @@ const (
 	APIerSv1SetDestination                    = "APIerSv1.SetDestination"
 	APIerSv1GetDataCost                       = "APIerSv1.GetDataCost"
 	APIerSv1ReplayFailedPosts                 = "APIerSv1.ReplayFailedPosts"
+	APIerSv1ReplayFailedReplications          = "APIerSv1.ReplayFailedReplications"
 	APIerSv1RemoveAccount                     = "APIerSv1.RemoveAccount"
 	APIerSv1DebitUsage                        = "APIerSv1.DebitUsage"
 	APIerSv1GetCacheStats                     = "APIerSv1.GetCacheStats"
@@ -1758,6 +1753,10 @@ const (
 	APIerSv1RewriteStorDB                     = "APIerSv1.RewriteStorDB"
 	APIerSv1BackupDataDB                      = "APIerSv1.BackupDataDB"
 	APIerSv1BackupStorDB                      = "APIerSv1.BackupStorDB"
+	APIerSv1RestoreDataDB                     = "APIerSv1.RestoreDataDB"
+	APIerSv1RestoreStorDB                     = "APIerSv1.RestoreStorDB"
+	APIerSv1SnapshotDataDB                    = "APIerSv1.SnapshotDataDB"
+	APIerSv1SnapshotStorDB                    = "APIerSv1.SnapshotStorDB"
 )
 
 // APIerSv1 TP APIs
@@ -1876,17 +1875,20 @@ const (
 
 // ThresholdS APIs
 const (
-	ThresholdSv1ProcessEvent          = "ThresholdSv1.ProcessEvent"
-	ThresholdSv1GetThreshold          = "ThresholdSv1.GetThreshold"
-	ThresholdSv1ResetThreshold        = "ThresholdSv1.ResetThreshold"
-	ThresholdSv1GetThresholdIDs       = "ThresholdSv1.GetThresholdIDs"
-	ThresholdSv1Ping                  = "ThresholdSv1.Ping"
-	ThresholdSv1GetThresholdsForEvent = "ThresholdSv1.GetThresholdsForEvent"
-	APIerSv1GetThresholdProfileIDs    = "APIerSv1.GetThresholdProfileIDs"
-	APIerSv1GetThresholdProfileCount  = "APIerSv1.GetThresholdProfileCount"
-	APIerSv1GetThresholdProfile       = "APIerSv1.GetThresholdProfile"
-	APIerSv1RemoveThresholdProfile    = "APIerSv1.RemoveThresholdProfile"
-	APIerSv1SetThresholdProfile       = "APIerSv1.SetThresholdProfile"
+	ThresholdSv1ProcessEvent               = "ThresholdSv1.ProcessEvent"
+	ThresholdSv1GetThreshold               = "ThresholdSv1.GetThreshold"
+	ThresholdSv1ResetThreshold             = "ThresholdSv1.ResetThreshold"
+	ThresholdSv1GetThresholdIDs            = "ThresholdSv1.GetThresholdIDs"
+	ThresholdSv1Ping                       = "ThresholdSv1.Ping"
+	ThresholdSv1GetThresholdsForEvent      = "ThresholdSv1.GetThresholdsForEvent"
+	ThresholdSv1RegisterInternalBiJSONConn = "ThresholdSv1.RegisterInternalBiJSONConn"
+	ThresholdSv1StoreClientConnID          = "ThresholdSv1.StoreClientConnID"
+	ThresholdSv1RemoveClientConnID         = "ThresholdSv1.RemoveClientConnID"
+	APIerSv1GetThresholdProfileIDs         = "APIerSv1.GetThresholdProfileIDs"
+	APIerSv1GetThresholdProfileCount       = "APIerSv1.GetThresholdProfileCount"
+	APIerSv1GetThresholdProfile            = "APIerSv1.GetThresholdProfile"
+	APIerSv1RemoveThresholdProfile         = "APIerSv1.RemoveThresholdProfile"
+	APIerSv1SetThresholdProfile            = "APIerSv1.SetThresholdProfile"
 )
 
 // StatS APIs
@@ -1964,47 +1966,48 @@ const (
 
 // SessionS APIs
 const (
-	SessionSv1AuthorizeEvent               = "SessionSv1.AuthorizeEvent"
-	SessionSv1AuthorizeEventWithDigest     = "SessionSv1.AuthorizeEventWithDigest"
-	SessionSv1InitiateSession              = "SessionSv1.InitiateSession"
-	SessionSv1InitiateSessionWithDigest    = "SessionSv1.InitiateSessionWithDigest"
-	SessionSv1UpdateSession                = "SessionSv1.UpdateSession"
-	SessionSv1SyncSessions                 = "SessionSv1.SyncSessions"
-	SessionSv1TerminateSession             = "SessionSv1.TerminateSession"
-	SessionSv1ProcessCDR                   = "SessionSv1.ProcessCDR"
-	SessionSv1ProcessMessage               = "SessionSv1.ProcessMessage"
-	SessionSv1ProcessEvent                 = "SessionSv1.ProcessEvent"
-	SessionSv1GetCost                      = "SessionSv1.GetCost"
-	SessionSv1GetActiveSessions            = "SessionSv1.GetActiveSessions"
-	SessionSv1GetActiveSessionsCount       = "SessionSv1.GetActiveSessionsCount"
-	SessionSv1ForceDisconnect              = "SessionSv1.ForceDisconnect"
-	SessionSv1GetPassiveSessions           = "SessionSv1.GetPassiveSessions"
-	SessionSv1GetPassiveSessionsCount      = "SessionSv1.GetPassiveSessionsCount"
-	SessionSv1SetPassiveSession            = "SessionSv1.SetPassiveSession"
-	SessionSv1Ping                         = "SessionSv1.Ping"
-	SessionSv1RegisterInternalBiJSONConn   = "SessionSv1.RegisterInternalBiJSONConn"
-	ThresholdSv1RegisterInternalBiJSONConn = "ThresholdSv1.RegisterInternalBiJSONConn"
-	SessionSv1ReplicateSessions            = "SessionSv1.ReplicateSessions"
-	SessionSv1ActivateSessions             = "SessionSv1.ActivateSessions"
-	SessionSv1DeactivateSessions           = "SessionSv1.DeactivateSessions"
-	SMGenericV1InitiateSession             = "SMGenericV1.InitiateSession"
-	SessionSv1AlterSessions                = "SessionSv1.AlterSessions"
-	SessionSv1DisconnectPeer               = "SessionSv1.DisconnectPeer"
-	SessionSv1STIRAuthenticate             = "SessionSv1.STIRAuthenticate"
-	SessionSv1STIRIdentity                 = "SessionSv1.STIRIdentity"
-	SessionSv1Sleep                        = "SessionSv1.Sleep"
-	SessionSv1CapsError                    = "SessionSv1.CapsError"
-	SessionSv1BackupActiveSessions         = "SessionSv1.BackupActiveSessions"
+	SessionSv1AuthorizeEvent             = "SessionSv1.AuthorizeEvent"
+	SessionSv1AuthorizeEventWithDigest   = "SessionSv1.AuthorizeEventWithDigest"
+	SessionSv1InitiateSession            = "SessionSv1.InitiateSession"
+	SessionSv1InitiateSessionWithDigest  = "SessionSv1.InitiateSessionWithDigest"
+	SessionSv1UpdateSession              = "SessionSv1.UpdateSession"
+	SessionSv1SyncSessions               = "SessionSv1.SyncSessions"
+	SessionSv1TerminateSession           = "SessionSv1.TerminateSession"
+	SessionSv1ProcessCDR                 = "SessionSv1.ProcessCDR"
+	SessionSv1ProcessMessage             = "SessionSv1.ProcessMessage"
+	SessionSv1ProcessEvent               = "SessionSv1.ProcessEvent"
+	SessionSv1GetCost                    = "SessionSv1.GetCost"
+	SessionSv1GetActiveSessions          = "SessionSv1.GetActiveSessions"
+	SessionSv1GetActiveSessionsCount     = "SessionSv1.GetActiveSessionsCount"
+	SessionSv1ForceDisconnect            = "SessionSv1.ForceDisconnect"
+	SessionSv1GetPassiveSessions         = "SessionSv1.GetPassiveSessions"
+	SessionSv1GetPassiveSessionsCount    = "SessionSv1.GetPassiveSessionsCount"
+	SessionSv1SetPassiveSession          = "SessionSv1.SetPassiveSession"
+	SessionSv1Ping                       = "SessionSv1.Ping"
+	SessionSv1RegisterInternalBiJSONConn = "SessionSv1.RegisterInternalBiJSONConn"
+	SessionSv1ReplicateSessions          = "SessionSv1.ReplicateSessions"
+	SessionSv1ActivateSessions           = "SessionSv1.ActivateSessions"
+	SessionSv1DeactivateSessions         = "SessionSv1.DeactivateSessions"
+	SMGenericV1InitiateSession           = "SMGenericV1.InitiateSession"
+	SessionSv1AlterSessions              = "SessionSv1.AlterSessions"
+	SessionSv1DisconnectPeer             = "SessionSv1.DisconnectPeer"
+	SessionSv1STIRAuthenticate           = "SessionSv1.STIRAuthenticate"
+	SessionSv1STIRIdentity               = "SessionSv1.STIRIdentity"
+	SessionSv1ThresholdNotify            = "SessionSv1.ThresholdNotify"
+	SessionSv1Sleep                      = "SessionSv1.Sleep"
+	SessionSv1CapsError                  = "SessionSv1.CapsError"
+	SessionSv1BackupActiveSessions       = "SessionSv1.BackupActiveSessions"
 )
 
 // Agent APIs
 const (
-	AgentV1                    = "AgentV1"
-	AgentV1DisconnectSession   = "AgentV1.DisconnectSession"
-	AgentV1GetActiveSessionIDs = "AgentV1.GetActiveSessionIDs"
-	AgentV1AlterSession        = "AgentV1.AlterSession"
-	AgentV1DisconnectPeer      = "AgentV1.DisconnectPeer"
-	AgentV1WarnDisconnect      = "AgentV1.WarnDisconnect"
+	AgentV1                           = "AgentV1"
+	AgentV1DisconnectSession          = "AgentV1.DisconnectSession"
+	AgentV1GetActiveSessionIDs        = "AgentV1.GetActiveSessionIDs"
+	AgentV1AlterSession               = "AgentV1.AlterSession"
+	AgentV1DisconnectPeer             = "AgentV1.DisconnectPeer"
+	AgentV1WarnDisconnect             = "AgentV1.WarnDisconnect"
+	AgentV1SpendingStatusNotification = "AgentV1.SpendingStatusNotification"
 )
 
 // Responder APIs
@@ -2405,6 +2408,7 @@ const (
 	InternalDBDumpIntervalCfg    = "internalDBDumpInterval"
 	InternalDBRewriteIntervalCfg = "internalDBRewriteInterval"
 	InternalDBFileSizeLimitCfg   = "internalDBFileSizeLimit"
+	RedisBatchSizeCfg            = "redisBatchSize"
 	RedisMaxConnsCfg             = "redisMaxConns"
 	RedisConnectAttemptsCfg      = "redisConnectAttempts"
 	RedisSentinelNameCfg         = "redisSentinel"
@@ -2414,8 +2418,6 @@ const (
 	RedisPoolPipelineWindowCfg   = "redisPoolPipelineWindow"
 	RedisPoolPipelineLimitCfg    = "redisPoolPipelineLimit"
 	RedisConnectTimeoutCfg       = "redisConnectTimeout"
-	RedisReadTimeoutCfg          = "redisReadTimeout"
-	RedisWriteTimeoutCfg         = "redisWriteTimeout"
 	RedisTLS                     = "redisTLS"
 	RedisClientCertificate       = "redisClientCertificate"
 	RedisClientKey               = "redisClientKey"
@@ -2552,6 +2554,7 @@ const (
 	SessionIndexesCfg         = "session_indexes"
 	ClientProtocolCfg         = "client_protocol"
 	ChannelSyncIntervalCfg    = "channel_sync_interval"
+	ChannelSyncTimeoutCfg     = "channel_sync_timeout"
 	StaleChanMaxExtraUsageCfg = "stale_chan_max_extra_usage"
 	TerminateAttemptsCfg      = "terminate_attempts"
 	AlterableFieldsCfg        = "alterable_fields"
@@ -2605,25 +2608,29 @@ const (
 	AsteriskConnsCfg = "asterisk_conns"
 
 	// DiameterAgentCfg
-	ListenNetCfg               = "listen_net"
-	NetworkCfg                 = "network"
-	ListenersCfg               = "listeners"
-	ListenCfg                  = "listen"
-	DictionariesPathCfg        = "dictionaries_path"
-	CeApplicationsCfg          = "ce_applications"
-	OriginHostCfg              = "origin_host"
-	OriginRealmCfg             = "origin_realm"
-	VendorIDCfg                = "vendor_id"
-	ProductNameCfg             = "product_name"
-	SyncedConnReqsCfg          = "synced_conn_requests"
-	ASRTemplateCfg             = "asr_template"
-	RARTemplateCfg             = "rar_template"
-	ForcedDisconnectCfg        = "forced_disconnect"
-	ConnStatusStatQueueIDsCfg  = "conn_status_stat_queue_ids"
-	ConnStatusThresholdIDsCfg  = "conn_status_threshold_ids"
-	ConnHealthCheckIntervalCfg = "conn_health_check_interval"
-	TemplatesCfg               = "templates"
-	RequestProcessorsCfg       = "request_processors"
+	ListenNetCfg                  = "listen_net"
+	NetworkCfg                    = "network"
+	ListenersCfg                  = "listeners"
+	ListenCfg                     = "listen"
+	DictionariesPathCfg           = "dictionaries_path"
+	DictionariesAppendDefaultsCfg = "dictionaries_append_defaults"
+	CeApplicationsCfg             = "ce_applications"
+	OriginHostCfg                 = "origin_host"
+	OriginRealmCfg                = "origin_realm"
+	VendorIDCfg                   = "vendor_id"
+	ProductNameCfg                = "product_name"
+	SyncedConnReqsCfg             = "synced_conn_requests"
+	ASRTemplateCfg                = "asr_template"
+	RARTemplateCfg                = "rar_template"
+	SNRTemplateCfg                = "snr_template"
+	SLRTemplateCfg                = "slr_template"
+	STRTemplateCfg                = "str_template"
+	ForcedDisconnectCfg           = "forced_disconnect"
+	ConnStatusStatQueueIDsCfg     = "conn_status_stat_queue_ids"
+	ConnStatusThresholdIDsCfg     = "conn_status_threshold_ids"
+	ConnHealthCheckIntervalCfg    = "conn_health_check_interval"
+	TemplatesCfg                  = "templates"
+	RequestProcessorsCfg          = "request_processors"
 
 	JanusConnsCfg = "janus_conns"
 	// RequestProcessor
@@ -2852,7 +2859,6 @@ const (
 	TenantCfg              = "tenant"
 	FlagsCfg               = "flags"
 	FieldsCfg              = "fields"
-	EEsIDsCfg              = "ees_ids"
 	EEsSuccessIDsCfg       = "ees_success_ids"
 	EEsFailedIDsCfg        = "ees_failed_ids"
 	CacheDumpFieldsCfg     = "cache_dump_fields"
@@ -3011,8 +3017,10 @@ const (
 	OptsAttributesProcessRuns          = "*attrProcessRuns"
 	OptsAttributesProfileRuns          = "*attrProfileRuns"
 	OptsAttributesProfileIgnoreFilters = "*attrProfileIgnoreFilters"
-	MetaEventTime                      = "*eventTime"
-	SchedulerInit                      = "SchedulerInit"
+	// Used to populate filters of Sy threshold profiles
+	OptsSyPolicyFilters = "*syPolicyFilters"
+	MetaEventTime       = "*eventTime"
+	SchedulerInit       = "SchedulerInit"
 
 	RemoteHostOpt = "*rmtHost"
 	CacheOpt      = "*cache"
@@ -3104,13 +3112,14 @@ const (
 	KafkaDefaultGroupID = "cgrates"
 	KafkaDefaultMaxWait = time.Millisecond
 
-	KafkaTopic         = "kafkaTopic"
-	KafkaBatchSize     = "kafkaBatchSize"
-	KafkaTLS           = "kafkaTLS"
-	KafkaCAPath        = "kafkaCAPath"
-	KafkaSkipTLSVerify = "kafkaSkipTLSVerify"
-	KafkaGroupID       = "kafkaGroupID"
-	KafkaMaxWait       = "kafkaMaxWait"
+	KafkaTopic           = "kafkaTopic"
+	KafkaLinger          = "kafkaLinger"
+	KafkaTLS             = "kafkaTLS"
+	KafkaCAPath          = "kafkaCAPath"
+	KafkaSkipTLSVerify   = "kafkaSkipTLSVerify"
+	KafkaDeliveryTimeout = "kafkaDeliveryTimeout"
+	KafkaGroupID         = "kafkaGroupID"
+	KafkaMaxWait         = "kafkaMaxWait"
 
 	// partial
 	PartialOpt = "*partial"
@@ -3119,6 +3128,8 @@ const (
 	PartialCacheActionOpt      = "partialCacheAction"
 	PartialPathOpt             = "partialPath"
 	PartialCSVFieldSepartorOpt = "partialcsvFieldSeparator"
+
+	IgnoreErroredItemsOpt = "ignoreErroredItems"
 
 	// EEs Elasticsearch options
 	ElsIndex                    = "elsIndex"
@@ -3131,7 +3142,6 @@ const (
 	ElsCAPath                   = "elsCAPath"
 	ElsDiscoverNodesOnStart     = "elsDiscoverNodesOnStart"
 	ElsDiscoverNodeInterval     = "elsDiscoverNodeInterval"
-	ElsCloud                    = "elsCloud"
 	ElsAPIKey                   = "elsAPIKey"
 	ElsCertificateFingerprint   = "elsCertificateFingerprint"
 	ElsServiceToken             = "elsServiceToken"
@@ -3282,17 +3292,6 @@ var StringTmplType = StringSet{
 	MetaSuffix:          struct{}{},
 	MetaSIPCID:          struct{}{},
 }
-
-// Time duration suffix
-const (
-	NsSuffix = "ns"
-	UsSuffix = "us"
-	µSuffix  = "µs"
-	MsSuffix = "ms"
-	SSuffix  = "s"
-	MSuffix  = "m"
-	HSuffix  = "h"
-)
 
 func buildCacheInstRevPrefixes() {
 	CachePrefixToInstance = make(map[string]string)

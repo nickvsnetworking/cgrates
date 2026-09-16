@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package main
 
@@ -49,15 +34,17 @@ var (
 		"Configuration directory path.")
 	exec = cgrTesterFlags.String(utils.ExecCgr, utils.EmptyString, "Pick what you want to test "+
 		"<*sessions|*cost>")
-	cps             = cgrTesterFlags.Int("cps", 100, "run n requests in parallel")
-	calls           = cgrTesterFlags.Int("calls", 100, "run n number of calls")
-	datadbType      = cgrTesterFlags.String("datadb_type", cgrConfig.DataDbCfg().Type, "The type of the DataDb database <redis>")
-	datadbHost      = cgrTesterFlags.String("datadb_host", cgrConfig.DataDbCfg().Host, "The DataDb host to connect to.")
-	datadbPort      = cgrTesterFlags.String("datadb_port", cgrConfig.DataDbCfg().Port, "The DataDb port to bind to.")
-	datadbName      = cgrTesterFlags.String("datadb_name", cgrConfig.DataDbCfg().Name, "The name/number of the DataDb to connect to.")
-	datadbUser      = cgrTesterFlags.String("datadb_user", cgrConfig.DataDbCfg().User, "The DataDb user to sign in as.")
-	datadbPass      = cgrTesterFlags.String("datadb_pass", cgrConfig.DataDbCfg().Password, "The DataDb user's password.")
-	dbdataEncoding  = cgrTesterFlags.String("dbdata_encoding", cgrConfig.GeneralCfg().DBDataEncoding, "The encoding used to store object data in strings.")
+	cps              = cgrTesterFlags.Int("cps", 100, "run n requests in parallel")
+	calls            = cgrTesterFlags.Int("calls", 100, "run n number of calls")
+	datadbType       = cgrTesterFlags.String("datadb_type", cgrConfig.DataDbCfg().Type, "The type of the DataDb database <redis>")
+	datadbHost       = cgrTesterFlags.String("datadb_host", cgrConfig.DataDbCfg().Host, "The DataDb host to connect to.")
+	datadbPort       = cgrTesterFlags.String("datadb_port", cgrConfig.DataDbCfg().Port, "The DataDb port to bind to.")
+	datadbName       = cgrTesterFlags.String("datadb_name", cgrConfig.DataDbCfg().Name, "The name/number of the DataDb to connect to.")
+	datadbUser       = cgrTesterFlags.String("datadb_user", cgrConfig.DataDbCfg().User, "The DataDb user to sign in as.")
+	datadbPass       = cgrTesterFlags.String("datadb_pass", cgrConfig.DataDbCfg().Password, "The DataDb user's password.")
+	dbdataEncoding   = cgrTesterFlags.String("dbdata_encoding", cgrConfig.GeneralCfg().DBDataEncoding, "The encoding used to store object data in strings.")
+	dbRedisBatchSize = cgrTesterFlags.Int(utils.RedisBatchSizeCfg, cgrConfig.DataDbCfg().Opts.RedisBatchSize,
+		"COUNT size used in redis SCAN queries")
 	dbRedisMaxConns = cgrTesterFlags.Int(utils.RedisMaxConnsCfg, cgrConfig.DataDbCfg().Opts.RedisMaxConns,
 		"The connection pool size")
 	dbRedisConnectAttempts = cgrTesterFlags.Int(utils.RedisConnectAttemptsCfg, cgrConfig.DataDbCfg().Opts.RedisConnectAttempts,
@@ -74,11 +61,7 @@ var (
 	dbRedisPoolPipelineLimit = cgrTesterFlags.Int(utils.RedisPoolPipelineLimitCfg, cgrConfig.DataDbCfg().Opts.RedisPoolPipelineLimit,
 		"Maximum number of commands that can be pipelined before flushing. Zero means no limit.")
 	dbRedisConnectTimeout = cgrTesterFlags.Duration(utils.RedisConnectTimeoutCfg, cgrConfig.DataDbCfg().Opts.RedisConnectTimeout,
-		"The amount of wait time until timeout for a connection attempt")
-	dbRedisReadTimeout = cgrTesterFlags.Duration(utils.RedisReadTimeoutCfg, cgrConfig.DataDbCfg().Opts.RedisReadTimeout,
-		"The amount of wait time until timeout for reading operations")
-	dbRedisWriteTimeout = cgrTesterFlags.Duration(utils.RedisWriteTimeoutCfg, cgrConfig.DataDbCfg().Opts.RedisWriteTimeout,
-		"The amount of wait time until timeout for writing operations")
+		"The read/write timeout for each connection.")
 	dbQueryTimeout = cgrTesterFlags.Duration("mongoQueryTimeout", cgrConfig.DataDbCfg().Opts.MongoQueryTimeout,
 		"The timeout for queries")
 	dbMongoConnScheme = cgrTesterFlags.String(utils.MongoConnSchemeCfg, cgrConfig.DataDbCfg().Opts.MongoConnScheme,
@@ -275,6 +258,9 @@ func main() {
 	if *dbdataEncoding != "" {
 		tstCfg.GeneralCfg().DBDataEncoding = *dbdataEncoding
 	}
+	if *dbRedisBatchSize != cgrConfig.DataDbCfg().Opts.RedisBatchSize {
+		tstCfg.DataDbCfg().Opts.RedisBatchSize = *dbRedisBatchSize
+	}
 	if *dbRedisMaxConns != cgrConfig.DataDbCfg().Opts.RedisMaxConns {
 		tstCfg.DataDbCfg().Opts.RedisMaxConns = *dbRedisMaxConns
 	}
@@ -295,12 +281,6 @@ func main() {
 	}
 	if *dbRedisConnectTimeout != cgrConfig.DataDbCfg().Opts.RedisConnectTimeout {
 		tstCfg.DataDbCfg().Opts.RedisConnectTimeout = *dbRedisConnectTimeout
-	}
-	if *dbRedisReadTimeout != cgrConfig.DataDbCfg().Opts.RedisReadTimeout {
-		tstCfg.DataDbCfg().Opts.RedisReadTimeout = *dbRedisReadTimeout
-	}
-	if *dbRedisWriteTimeout != cgrConfig.DataDbCfg().Opts.RedisWriteTimeout {
-		tstCfg.DataDbCfg().Opts.RedisWriteTimeout = *dbRedisWriteTimeout
 	}
 	if *dbRedisPoolPipelineWindow != cgrConfig.DataDbCfg().Opts.RedisPoolPipelineWindow {
 		tstCfg.DataDbCfg().Opts.RedisPoolPipelineWindow = *dbRedisPoolPipelineWindow

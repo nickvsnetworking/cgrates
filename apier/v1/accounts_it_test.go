@@ -1,29 +1,16 @@
 //go:build integration
 // +build integration
 
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package v1
 
 import (
 	"errors"
 	"path"
 	"reflect"
+	"sort"
 	"testing"
 	"time"
 
@@ -733,6 +720,20 @@ func testAccITCountAccounts(t *testing.T) {
 		t.Error(err)
 	} else if reply != 12 {
 		t.Errorf("Expecting: %v, received: %v", 12, reply)
+	}
+	var ids []string
+	if err := accRPC.Call(context.Background(), utils.APIerSv1GetAccountIDs,
+		&utils.PaginatorWithTenant{Tenant: "cgrates.org"}, &ids); err != nil {
+		t.Error(err)
+	}
+	sort.Strings(ids)
+	expected := []string{
+		"AddBalanceWithNegative", "account1", "account2", "account3", "account4",
+		"refundAcc", "test", "testAccAddBalance", "testAccITSetBalanceWithExtraData",
+		"testAccITSetBalanceWithExtraData2", "testAccSetBalance", "testrandomAccoutSetBalance",
+	}
+	if !reflect.DeepEqual(ids, expected) {
+		t.Errorf("expected %v, received %v", expected, ids)
 	}
 }
 func testAccITCountAccountsWithoutTenant(t *testing.T) {

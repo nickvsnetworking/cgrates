@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package utils
 
@@ -157,16 +142,12 @@ func IfaceAsBig(itm any) (b *decimal.Big, err error) {
 	case float64: // automatically hitting here also ints
 		return new(decimal.Big).SetFloat64(it), nil
 	case string:
-		if strings.HasSuffix(it, NsSuffix) ||
-			strings.HasSuffix(it, UsSuffix) ||
-			strings.HasSuffix(it, µSuffix) ||
-			strings.HasSuffix(it, MsSuffix) ||
-			strings.HasSuffix(it, SSuffix) ||
-			strings.HasSuffix(it, MSuffix) ||
-			strings.HasSuffix(it, HSuffix) {
+		if strings.HasSuffix(it, "s") ||
+			strings.HasSuffix(it, "m") ||
+			strings.HasSuffix(it, "h") {
 			var tm time.Duration
 			if tm, err = time.ParseDuration(it); err != nil {
-				return
+				return nil, err
 			}
 			return decimal.New(int64(tm), 0), nil
 		}
@@ -283,7 +264,7 @@ func IfaceAsTInt64(itm any) (i int64, err error) {
 	return
 }
 
-func IfaceAsFloat64(itm any) (f float64, err error) {
+func IfaceAsFloat64(itm any) (float64, error) {
 	switch it := itm.(type) {
 	case float64:
 		return it, nil
@@ -294,35 +275,33 @@ func IfaceAsFloat64(itm any) (f float64, err error) {
 	case int64:
 		return float64(it), nil
 	case string:
-		return strconv.ParseFloat(it, 64)
-	default:
-		err = fmt.Errorf("cannot convert field: %+v to float64", it)
-	}
-	return
-}
-func IfaceAsTFloat64(itm any) (f float64, err error) {
-	switch it := itm.(type) {
-	case float64:
-		return it, nil
-	case time.Duration:
-		return float64(it.Nanoseconds()), nil
-	case int:
-		return float64(it), nil
-	case int64:
-		return float64(it), nil
-	case string:
-		if strings.HasSuffix(it, SSuffix) || strings.HasSuffix(it, MSuffix) || strings.HasSuffix(it, HSuffix) {
-			var tm time.Duration
-			if tm, err = time.ParseDuration(it); err != nil {
-				return
+		if strings.HasSuffix(it, "s") ||
+			strings.HasSuffix(it, "m") ||
+			strings.HasSuffix(it, "h") {
+			tm, err := time.ParseDuration(it)
+			if err != nil {
+				return 0, err
 			}
 			return float64(tm), nil
 		}
 		return strconv.ParseFloat(it, 64)
 	default:
-		err = fmt.Errorf("cannot convert field: %+v to float64", it)
+		return 0, fmt.Errorf("cannot convert field: %+v to float64", it)
 	}
-	return
+}
+
+// BalanceWeightAsFloat64 converts a Weight string to float64.
+// It supports predefined strings to generate a value:
+//   - *time_desc: unix time until 2050
+//   - *time_asc: current unix time
+func BalanceWeightAsFloat64(s string) (float64, error) {
+	switch s {
+	case MetaTimeDesc:
+		return float64(time.Date(2050, 1, 1, 0, 0, 0, 0, time.UTC).Unix() - time.Now().Unix()), nil
+	case MetaTimeAsc:
+		return float64(time.Now().Unix()), nil
+	}
+	return strconv.ParseFloat(s, 64)
 }
 
 func IfaceAsBool(itm any) (b bool, err error) {

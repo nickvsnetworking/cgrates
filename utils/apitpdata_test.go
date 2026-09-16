@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package utils
 
 import (
@@ -201,6 +187,127 @@ func TestNewTiming(t *testing.T) {
 	eOut.EndTime = "11:11:11"
 	if !reflect.DeepEqual(eOut, rcv) {
 		t.Errorf("Expected %+v, received %+v", eOut, rcv)
+	}
+}
+
+func TestTPRatingPlanClone(t *testing.T) {
+
+	tests := []struct {
+		name          string
+		tprratingPlan *TPRatingPlan
+	}{
+		{
+			name: "Complete TPRRatingPlan",
+			tprratingPlan: &TPRatingPlan{
+				TPid: "tarif_1",
+				ID:   "id_1",
+				RatingPlanBindings: []*TPRatingPlanBinding{
+					{
+						DestinationRatesId: "dest_1",
+						TimingId:           "time_1",
+						Weight:             0.0,
+						timing: &TPTiming{
+							ID:        "Timing_1",
+							Years:     Years{2024, 2025, 2026},
+							Months:    Months{time.February, time.March},
+							MonthDays: MonthDays{1, 2, 3},
+							WeekDays:  WeekDays{time.Monday},
+							StartTime: "00:00:00",
+							EndTime:   "00:50:00",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Empty values TPRRatingPlan",
+			tprratingPlan: &TPRatingPlan{
+				TPid:               "",
+				ID:                 "",
+				RatingPlanBindings: []*TPRatingPlanBinding{},
+			},
+		},
+		{
+			name:          "Nil TPRRatingPlan",
+			tprratingPlan: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tprratingPlan.Clone()
+
+			if !reflect.DeepEqual(result, tt.tprratingPlan) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tprratingPlan)
+			}
+
+			if &result == &tt.tprratingPlan {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.tprratingPlan.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.tprratingPlan) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.tprratingPlan)
+			}
+			if cache != nil && tt.tprratingPlan != nil {
+				if cache == tt.tprratingPlan {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+
+			_, ok := cache.(*TPRatingPlan)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPRatingPlan", cache)
+				return
+			}
+		})
+	}
+}
+
+func TestTPRatingPlanBinding_Clone(t *testing.T) {
+	tests := []struct {
+		name           string
+		tprPlanbinding *TPRatingPlanBinding
+	}{
+		{
+			name: "Comlete Struct",
+			tprPlanbinding: &TPRatingPlanBinding{
+
+				DestinationRatesId: "dest_1",
+				TimingId:           "time_1",
+				Weight:             0.0,
+				timing: &TPTiming{
+					ID:        "Timing_1",
+					Years:     Years{2024, 2025, 2026},
+					Months:    Months{time.February, time.March},
+					MonthDays: MonthDays{1, 2, 3},
+					WeekDays:  WeekDays{time.Monday},
+					StartTime: "00:00:00",
+					EndTime:   "00:50:00",
+				},
+			},
+		},
+		{
+			name:           "Nil TPRatingPlanBinding",
+			tprPlanbinding: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tprPlanbinding.Clone()
+
+			if !reflect.DeepEqual(result, tt.tprPlanbinding) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tprPlanbinding)
+			}
+
+			if &result == &tt.tprPlanbinding {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+
+		})
 	}
 }
 
@@ -1198,6 +1305,13 @@ func TestIsTimeFormatedFalse(t *testing.T) {
 	}
 }
 
+func TestIsTimeFormatedFalseWithPrefix(t *testing.T) {
+	timeString := "+*any"
+	if IsTimeFormated(timeString) {
+		t.Error("expected false, but returned true")
+	}
+}
+
 func TestTPDestinationClone(t *testing.T) {
 	tests := []struct {
 		name string
@@ -1453,6 +1567,25 @@ func TestTPRatingProfileClone(t *testing.T) {
 				}
 			}
 		})
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.rpf.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.rpf) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.rpf)
+			}
+			if cache != nil && tt.rpf != nil {
+				if cache == tt.rpf {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+
+			_, ok := cache.(*TPRatingProfile)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPRatingProfile", cache)
+				return
+			}
+		})
 	}
 }
 
@@ -1640,7 +1773,7 @@ func TestTPRateRALsCacheClone(t *testing.T) {
 				}
 			}
 
-			if tt.tpr.RateSlots != nil && len(tt.tpr.RateSlots) > 0 {
+			if len(tt.tpr.RateSlots) > 0 {
 				originalRate := tt.tpr.RateSlots[0].Rate
 				tt.tpr.RateSlots[0].Rate = 999.99
 
@@ -1733,7 +1866,7 @@ func TestTPRankingProfileClone(t *testing.T) {
 				t.Errorf("Clone() = %v, want %v", got, tt.want)
 			}
 
-			if tt.trp.StatIDs != nil && len(tt.trp.StatIDs) > 0 {
+			if len(tt.trp.StatIDs) > 0 {
 				originalSlice := tt.trp.StatIDs
 				clonedSlice := got.StatIDs
 				clonedSlice[0] = "modified"
@@ -1742,7 +1875,7 @@ func TestTPRankingProfileClone(t *testing.T) {
 				}
 			}
 
-			if tt.trp.MetricIDs != nil && len(tt.trp.MetricIDs) > 0 {
+			if len(tt.trp.MetricIDs) > 0 {
 				originalSlice := tt.trp.MetricIDs
 				clonedSlice := got.MetricIDs
 				clonedSlice[0] = "modified"
@@ -1751,7 +1884,7 @@ func TestTPRankingProfileClone(t *testing.T) {
 				}
 			}
 
-			if tt.trp.SortingParameters != nil && len(tt.trp.SortingParameters) > 0 {
+			if len(tt.trp.SortingParameters) > 0 {
 				originalSlice := tt.trp.SortingParameters
 				clonedSlice := got.SortingParameters
 				clonedSlice[0] = "modified"
@@ -1760,13 +1893,29 @@ func TestTPRankingProfileClone(t *testing.T) {
 				}
 			}
 
-			if tt.trp.ThresholdIDs != nil && len(tt.trp.ThresholdIDs) > 0 {
+			if len(tt.trp.ThresholdIDs) > 0 {
 				originalSlice := tt.trp.ThresholdIDs
 				clonedSlice := got.ThresholdIDs
 				clonedSlice[0] = "modified"
 				if originalSlice[0] == clonedSlice[0] {
 					t.Errorf("Clone() did not create a deep copy of ThresholdIDs")
 				}
+			}
+		})
+		t.Run(tt.name, func(t *testing.T) {
+
+			got := tt.trp.CacheClone()
+
+			if reflect.TypeOf(got) != reflect.TypeOf(tt.want) {
+				t.Errorf("CacheClone() returned wrong type: got %T, want %T", got, tt.want)
+			}
+
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("CacheClone() = %v, want %v", got, tt.want)
+			}
+
+			if got == tt.want {
+				t.Errorf("CacheClone() returned the same instance, expected a new instance")
 			}
 		})
 	}
@@ -1845,7 +1994,7 @@ func TestTPDestinationCacheClone(t *testing.T) {
 					t.Errorf("CacheClone().Prefixes[%d] = %v, want %v", i, gotTPD.Prefixes[i], prefix)
 				}
 			}
-			if tt.tpd.Prefixes != nil && len(tt.tpd.Prefixes) > 0 {
+			if len(tt.tpd.Prefixes) > 0 {
 				originalPrefix := tt.tpd.Prefixes[0]
 				tt.tpd.Prefixes[0] = "modified"
 
@@ -2139,7 +2288,91 @@ func TestTPDestinationRateClone(t *testing.T) {
 				}
 			}
 		})
+
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.tpdr.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.tpdr) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.tpdr)
+			}
+			if cache != nil && tt.tpdr != nil {
+				if cache == tt.tpdr {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+
+			_, ok := cache.(*TPDestinationRate)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPDestinationRate", cache)
+				return
+			}
+		})
 	}
+}
+
+func TestDestinationRateClone(t *testing.T) {
+	tests := []struct {
+		name            string
+		destinationRate *DestinationRate
+	}{
+		{
+			name: "Complete Destination Rate",
+			destinationRate: &DestinationRate{
+
+				DestinationId:    "DST1",
+				RateId:           "RT1",
+				RoundingMethod:   "*up",
+				RoundingDecimals: 4,
+				MaxCost:          0.60,
+				MaxCostStrategy:  "*disconnect",
+				Rate: &TPRateRALs{
+					TPid: "TP1",
+					ID:   "RT1",
+					RateSlots: []*RateSlot{
+						{
+							ConnectFee:         0.10,
+							Rate:               0.05,
+							RateUnit:           "60s",
+							RateIncrement:      "1s",
+							GroupIntervalStart: "0s",
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "Empty values for DestinationRate",
+			destinationRate: &DestinationRate{
+				DestinationId:    "",
+				RateId:           "",
+				RoundingMethod:   "",
+				RoundingDecimals: 0,
+				MaxCost:          0.0,
+				MaxCostStrategy:  "",
+				Rate:             nil,
+			},
+		},
+		{
+			name:            "Nil DestinationRate",
+			destinationRate: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.destinationRate.Clone()
+
+			if !reflect.DeepEqual(result, tt.destinationRate) {
+				t.Errorf("Clone() = %v, want %v", result, tt.destinationRate)
+			}
+
+			if &result == &tt.destinationRate {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+	}
+
 }
 
 func TestApierTPTimingClone(t *testing.T) {
@@ -2239,7 +2472,99 @@ func TestApierTPTimingClone(t *testing.T) {
 				}
 			}
 		})
+
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.timing.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.timing) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.timing)
+			}
+			if cache != nil && tt.timing != nil {
+				if cache == tt.timing {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+
+			_, ok := cache.(*ApierTPTiming)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *ApierTPTiming", cache)
+				return
+			}
+		})
 	}
+}
+
+func TestTPTiming(t *testing.T) {
+
+	tests := []struct {
+		name   string
+		timing *TPTiming
+	}{
+		{
+			name: "Complete TPTiming",
+			timing: &TPTiming{
+				ID:        "Timing_1",
+				Years:     Years{2024, 2025, 2026},
+				Months:    Months{time.February, time.March},
+				MonthDays: MonthDays{1, 2, 3},
+				WeekDays:  WeekDays{time.Monday},
+				StartTime: "00:00:00",
+				EndTime:   "00:50:00",
+			},
+		},
+		{
+			name:   "Nil timing",
+			timing: nil,
+		},
+		{
+			name: "TPTiming with empty values",
+			timing: &TPTiming{
+				ID:        "",
+				Years:     Years{},
+				Months:    Months{},
+				MonthDays: MonthDays{},
+				WeekDays:  WeekDays{},
+				StartTime: "",
+				EndTime:   "",
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.timing.Clone()
+
+			if !reflect.DeepEqual(result, tt.timing) {
+				t.Errorf("Clone() = %v, want %v", result, tt.timing)
+			}
+
+			if &result == &tt.timing {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.timing.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.timing) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.timing)
+			}
+			if cache != nil && tt.timing != nil {
+				if cache == tt.timing {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+
+			_, ok := cache.(*TPTiming)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPTiming", cache)
+				return
+			}
+		})
+	}
+
 }
 
 func TestTPActionClone(t *testing.T) {
@@ -2424,8 +2749,7 @@ func TestMetricWithFiltersClone(t *testing.T) {
 					t.Errorf("Clone affected by change to original MetricID. Expected: %s, Got: %s",
 						originalMetricID, result.MetricID)
 				}
-
-				if tt.mwf.FilterIDs != nil && len(tt.mwf.FilterIDs) > 0 {
+				if len(tt.mwf.FilterIDs) > 0 {
 					originalFilterIDs := make([]string, len(tt.mwf.FilterIDs))
 					copy(originalFilterIDs, tt.mwf.FilterIDs)
 
@@ -2588,6 +2912,1538 @@ func TestTPAttributeClone(t *testing.T) {
 						t.Error("Clone's nil FilterIDs changed after setting original to non-nil")
 					}
 				}
+			}
+		})
+	}
+}
+
+func TestRateSlot_Clone(t *testing.T) {
+	tests := []struct {
+		name     string
+		rateslot *RateSlot
+	}{
+		{
+			name: "Complete RateSlot",
+			rateslot: &RateSlot{
+				ConnectFee:            0.1,
+				Rate:                  0.2,
+				RateUnit:              "60s",
+				RateIncrement:         "1s",
+				GroupIntervalStart:    "0s",
+				rateUnitDur:           60 * time.Second,
+				rateIncrementDur:      time.Second,
+				groupIntervalStartDur: 0,
+				tag:                   "first",
+			},
+		},
+		{
+			name:     "Nil RateSlot",
+			rateslot: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.rateslot.Clone()
+
+			if !reflect.DeepEqual(result, tt.rateslot) {
+				t.Errorf("Clone() = %v, want %v", result, tt.rateslot)
+			}
+
+			if &result == &tt.rateslot {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+	}
+}
+
+func TestTPRatingActivation_Clone(t *testing.T) {
+	tests := []struct {
+		name        string
+		tpratingact *TPRatingActivation
+	}{
+		{
+			name: "Complete TPRatingActivation",
+			tpratingact: &TPRatingActivation{
+				ActivationTime:   "2022-01-01T00:00:00Z",
+				RatingPlanId:     "RP_1001",
+				FallbackSubjects: "1002;1003",
+			},
+		},
+		{
+			name:        "Nil TPRatingActivation",
+			tpratingact: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpratingact.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpratingact) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpratingact)
+			}
+
+			if &result == &tt.tpratingact {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+	}
+}
+
+func TestTPActions_Clone(t *testing.T) {
+	tests := []struct {
+		name      string
+		tpactions *TPActions
+	}{
+		{
+			name: "Empty Actions value in TPActions",
+			tpactions: &TPActions{
+				TPid:    "tpid_1",
+				ID:      "id_1",
+				Actions: []*TPAction{},
+			},
+		},
+		{
+			name: "Complete TPActions",
+			tpactions: &TPActions{
+				TPid: "tpid_1",
+				ID:   "id_1",
+				Actions: []*TPAction{
+					{
+						Identifier:      "TOPUP",
+						BalanceId:       "balance123",
+						BalanceUuid:     "uuid-456",
+						BalanceType:     "monetary",
+						Units:           "10",
+						ExpiryTime:      "2025-12-31T23:59:59Z",
+						Filters:         "filter1;filter2",
+						TimingTags:      "weekdays;offpeak",
+						DestinationIds:  "DST_EU;DST_US",
+						RatingSubject:   "premium",
+						Categories:      "call;data",
+						SharedGroups:    "group1;group2",
+						BalanceWeight:   "10",
+						ExtraParameters: "param1=value1;param2=value2",
+						BalanceBlocker:  "false",
+						BalanceDisabled: "false",
+						Weight:          20.5,
+					},
+				},
+			},
+		},
+		{
+			name:      "Nil TPActions",
+			tpactions: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpactions.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpactions) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpactions)
+			}
+
+			if &result == &tt.tpactions {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.tpactions.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.tpactions) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.tpactions)
+			}
+			if cache != nil && tt.tpactions != nil {
+				if cache == tt.tpactions {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+
+			_, ok := cache.(*TPActions)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPActions", cache)
+				return
+			}
+		})
+	}
+}
+
+func TestTPSharedGroups_Clone(t *testing.T) {
+	tests := []struct {
+		name         string
+		sharedgroups *TPSharedGroups
+	}{
+		{
+			name: "Complete TPSharedGroups",
+			sharedgroups: &TPSharedGroups{
+				TPid: "tpid_2",
+				ID:   "id_2",
+				SharedGroups: []*TPSharedGroup{
+					{
+						Account:       "acc_name",
+						Strategy:      "test strategy",
+						RatingSubject: "test rating subject",
+					},
+				},
+			},
+		},
+		{
+			name:         "Nil TPSharedGroups",
+			sharedgroups: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.sharedgroups.Clone()
+
+			if !reflect.DeepEqual(result, tt.sharedgroups) {
+				t.Errorf("Clone() = %v, want %v", result, tt.sharedgroups)
+			}
+
+			if &result == &tt.sharedgroups {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.sharedgroups.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.sharedgroups) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.sharedgroups)
+			}
+			if cache != nil && tt.sharedgroups != nil {
+				if cache == tt.sharedgroups {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+
+			_, ok := cache.(*TPSharedGroups)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPSharedGroups", cache)
+				return
+			}
+		})
+	}
+}
+
+func TestTPSharedGroup_Clone(t *testing.T) {
+	tests := []struct {
+		name     string
+		sharedgr *TPSharedGroup
+	}{
+		{
+			name: "Complete TPSharedGroup",
+			sharedgr: &TPSharedGroup{
+				Account:       "acc_name",
+				Strategy:      "test strategy",
+				RatingSubject: "test rating subject",
+			},
+		},
+		{
+			name:     "Nil TPSharedGroup",
+			sharedgr: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.sharedgr.Clone()
+
+			if !reflect.DeepEqual(result, tt.sharedgr) {
+				t.Errorf("Clone() = %v, want %v", result, tt.sharedgr)
+			}
+
+			if &result == &tt.sharedgr {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+	}
+}
+
+func TestTPActionPlan_Clone(t *testing.T) {
+	tests := []struct {
+		name       string
+		actionplan *TPActionPlan
+	}{
+		{
+			name: "Complete TPActionPlan",
+			actionplan: &TPActionPlan{
+				TPid: "tpid_1",
+				ID:   "id_1",
+				ActionPlan: []*TPActionTiming{
+					{
+						ActionsId: "action_id_1",
+						TimingId:  "tm_1",
+						Weight:    0.2,
+					},
+				},
+			},
+		},
+		{
+			name:       "Nil TPActionPlan",
+			actionplan: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.actionplan.Clone()
+
+			if !reflect.DeepEqual(result, tt.actionplan) {
+				t.Errorf("Clone() = %v, want %v", result, tt.actionplan)
+			}
+
+			if &result == &tt.actionplan {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.actionplan.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.actionplan) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.actionplan)
+			}
+			if cache != nil && tt.actionplan != nil {
+				if cache == tt.actionplan {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+
+			_, ok := cache.(*TPActionPlan)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPActionPlan", cache)
+				return
+			}
+		})
+	}
+}
+
+func TestTPActionTiming_Clone(t *testing.T) {
+	tests := []struct {
+		name         string
+		actionTiming *TPActionTiming
+	}{
+		{
+			name: "Complete TPActionTiming",
+			actionTiming: &TPActionTiming{
+				ActionsId: "action_id_1",
+				TimingId:  "tm_1",
+				Weight:    0.2,
+			},
+		},
+		{
+			name:         "Nil TPActionTiming",
+			actionTiming: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.actionTiming.Clone()
+
+			if !reflect.DeepEqual(result, tt.actionTiming) {
+				t.Errorf("Clone() = %v, want %v", result, tt.actionTiming)
+			}
+
+			if &result == &tt.actionTiming {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+	}
+}
+
+func TestTPActionTrigger_Clone(t *testing.T) {
+	tests := []struct {
+		name      string
+		actrigger *TPActionTrigger
+	}{
+		{
+			name: "Complete TPActionTrigger",
+			actrigger: &TPActionTrigger{
+				Id:                    "STANDARD_TRIGGERS",
+				UniqueID:              "1",
+				ThresholdType:         "*min_balance",
+				ThresholdValue:        2.0,
+				Recurrent:             false,
+				MinSleep:              "0",
+				BalanceId:             "b1",
+				BalanceType:           "*monetary",
+				BalanceDestinationIds: "",
+				BalanceWeight:         "0.0",
+				BalanceExpirationDate: "*never",
+				BalanceTimingTags:     "T1",
+				BalanceRatingSubject:  "special1",
+				BalanceCategories:     "call",
+				BalanceSharedGroups:   "SHARED_1",
+				BalanceBlocker:        "false",
+				BalanceDisabled:       "false",
+				ActionsId:             "LOG_WARNING",
+				Weight:                10,
+			},
+		},
+		{
+			name:      "Nil TPActionTrigger",
+			actrigger: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.actrigger.Clone()
+
+			if !reflect.DeepEqual(result, tt.actrigger) {
+				t.Errorf("Clone() = %v, want %v", result, tt.actrigger)
+			}
+
+			if &result == &tt.actrigger {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+	}
+}
+
+func TestTPActionTriggers_Clone(t *testing.T) {
+	tests := []struct {
+		name       string
+		actriggers *TPActionTriggers
+	}{
+		{
+			name: "Complete TPActionTriggers",
+			actriggers: &TPActionTriggers{
+				TPid: "tpid_1",
+				ID:   "id_1",
+				ActionTriggers: []*TPActionTrigger{
+					{
+						Id:                    "STANDARD_TRIGGERS",
+						UniqueID:              "1",
+						ThresholdType:         "*min_balance",
+						ThresholdValue:        2.0,
+						Recurrent:             false,
+						MinSleep:              "0",
+						BalanceId:             "b1",
+						BalanceType:           "*monetary",
+						BalanceDestinationIds: "",
+						BalanceWeight:         "0.0",
+						BalanceExpirationDate: "*never",
+						BalanceTimingTags:     "T1",
+						BalanceRatingSubject:  "special1",
+						BalanceCategories:     "call",
+						BalanceSharedGroups:   "SHARED_1",
+						BalanceBlocker:        "false",
+						BalanceDisabled:       "false",
+						ActionsId:             "LOG_WARNING",
+						Weight:                10,
+					},
+				},
+			},
+		},
+		{
+			name:       "Nil TPActionTriggers",
+			actriggers: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.actriggers.Clone()
+
+			if !reflect.DeepEqual(result, tt.actriggers) {
+				t.Errorf("Clone() = %v, want %v", result, tt.actriggers)
+			}
+
+			if &result == &tt.actriggers {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.actriggers.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.actriggers) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.actriggers)
+			}
+			if cache != nil && tt.actriggers != nil {
+				if cache == tt.actriggers {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+
+			_, ok := cache.(*TPActionTriggers)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPActionTriggers", cache)
+				return
+			}
+		})
+	}
+}
+
+func TestTPAccountActions_Clone(t *testing.T) {
+	tests := []struct {
+		name         string
+		tpaccActions *TPAccountActions
+	}{
+		{
+			name: "Complete TPAccountActions",
+			tpaccActions: &TPAccountActions{
+				TPid:          "TP1",
+				LoadId:        "ID",
+				Tenant:        "cgrates.org",
+				Account:       "1001",
+				ActionPlanId:  "PREPAID_10",
+				AllowNegative: true,
+				Disabled:      false,
+			},
+		},
+		{
+			name:         "Nil TPAccountActions",
+			tpaccActions: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpaccActions.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpaccActions) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpaccActions)
+			}
+
+			if &result == &tt.tpaccActions {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.tpaccActions.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.tpaccActions) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.tpaccActions)
+			}
+			if cache != nil && tt.tpaccActions != nil {
+				if cache == tt.tpaccActions {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+
+			_, ok := cache.(*TPAccountActions)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPAccountActions", cache)
+				return
+			}
+		})
+	}
+}
+
+func TestTPResourceProfile_Clone(t *testing.T) {
+	tests := []struct {
+		name         string
+		tpresProfile *TPResourceProfile
+	}{
+		{
+			name: "Complete TPResourceProfile",
+			tpresProfile: &TPResourceProfile{
+				TPid:               "TP1",
+				Tenant:             "tenant1",
+				ID:                 "RP1",
+				Weight:             10.8,
+				FilterIDs:          []string{"FILTR_RES_1"},
+				ActivationInterval: &TPActivationInterval{ActivationTime: "2026-03-18T12:00:00Z"},
+				UsageTTL:           "Test_TTL",
+				Limit:              "2",
+				AllocationMessage:  "asd",
+				Blocker:            false,
+				ThresholdIDs:       []string{"TH1"},
+				Stored:             true,
+			},
+		},
+		{
+			name: "Specific nil fields for TPResourceProfile",
+			tpresProfile: &TPResourceProfile{
+				TPid:               "TP1",
+				Tenant:             "tenant1",
+				ID:                 "RP1",
+				Weight:             10.8,
+				FilterIDs:          nil,
+				ActivationInterval: nil,
+				UsageTTL:           "Test_TTL",
+				Limit:              "2",
+				AllocationMessage:  "asd",
+				Blocker:            false,
+				ThresholdIDs:       nil,
+				Stored:             true,
+			},
+		},
+		{
+			name:         "Nil TPResourceProfile",
+			tpresProfile: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpresProfile.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpresProfile) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpresProfile)
+			}
+
+			if &result == &tt.tpresProfile {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.tpresProfile.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.tpresProfile) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.tpresProfile)
+			}
+			if cache != nil && tt.tpresProfile != nil {
+				if cache == tt.tpresProfile {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+
+			_, ok := cache.(*TPResourceProfile)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPResourceProfile", cache)
+				return
+			}
+		})
+	}
+}
+
+func TestTPActivationInterval_Clone(t *testing.T) {
+	tests := []struct {
+		name               string
+		activationInterval *TPActivationInterval
+	}{
+		{
+			name: "Complete TPActivationInterval",
+			activationInterval: &TPActivationInterval{
+				ActivationTime: "2014-07-29T15:00:00Z",
+				ExpiryTime:     "",
+			},
+		},
+		{
+			name:               "Nil TPActivationInterval",
+			activationInterval: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.activationInterval.Clone()
+
+			if !reflect.DeepEqual(result, tt.activationInterval) {
+				t.Errorf("Clone() = %v, want %v", result, tt.activationInterval)
+			}
+
+			if &result == &tt.activationInterval {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+	}
+}
+
+func TestTPStatProfile_Clone(t *testing.T) {
+	tests := []struct {
+		name          string
+		tpstatProfile *TPStatProfile
+	}{
+		{
+			name: "Complete TPStatProfile",
+			tpstatProfile: &TPStatProfile{
+				TPid:               "TP1",
+				Tenant:             "cgrates.org",
+				ID:                 "Stats1",
+				FilterIDs:          []string{"FLTR_1"},
+				ActivationInterval: &TPActivationInterval{"2014-07-29T15:00:00Z", ""},
+				QueueLength:        100,
+				TTL:                "1s",
+				Metrics: []*MetricWithFilters{
+					{
+						MetricID: MetaASR,
+					},
+				},
+				ThresholdIDs: []string{"*none"},
+				Weight:       20.0,
+				Stored:       true,
+				MinItems:     1,
+			},
+		},
+		{
+			name:          "Nil TPStatProfile",
+			tpstatProfile: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpstatProfile.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpstatProfile) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpstatProfile)
+			}
+
+			if &result == &tt.tpstatProfile {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.tpstatProfile.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.tpstatProfile) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.tpstatProfile)
+			}
+			if cache != nil && tt.tpstatProfile != nil {
+				if cache == tt.tpstatProfile {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+
+			_, ok := cache.(*TPStatProfile)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPStatProfile", cache)
+				return
+			}
+		})
+	}
+}
+
+func TestTPTrendsProfile_Clone(t *testing.T) {
+	tests := []struct {
+		name             string
+		tpttrendsProfile *TPTrendsProfile
+	}{
+		{
+			name: "Complete TPTrendsProfile",
+			tpttrendsProfile: &TPTrendsProfile{
+				TPid:            "tpid2",
+				Tenant:          "tenant2",
+				ID:              "id2",
+				Schedule:        "weekly",
+				StatID:          "std1",
+				QueueLength:     15,
+				TTL:             "7200",
+				MinItems:        10,
+				CorrelationType: "type2",
+				Tolerance:       0.2,
+				Stored:          false,
+				ThresholdIDs:    []string{"threshold1", "threshold2"},
+				Metrics:         []string{"metric1", "metric2"},
+			},
+		},
+		{
+			name:             "Nil case",
+			tpttrendsProfile: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpttrendsProfile.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpttrendsProfile) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpttrendsProfile)
+			}
+
+			if result != nil && result == tt.tpttrendsProfile {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.tpttrendsProfile.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.tpttrendsProfile) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.tpttrendsProfile)
+			}
+			if cache != nil && tt.tpttrendsProfile != nil {
+				if cache == tt.tpttrendsProfile {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+
+			_, ok := cache.(*TPTrendsProfile)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPTrendsProfile", cache)
+				return
+			}
+		})
+	}
+}
+
+func TestTPThresholdProfile_Clone(t *testing.T) {
+	tests := []struct {
+		name               string
+		tpthresholdProfile *TPThresholdProfile
+	}{
+		{
+			name: "Complete TPThresholdProfile",
+			tpthresholdProfile: &TPThresholdProfile{
+				TPid:      "TP1",
+				Tenant:    "tenant1",
+				ID:        "TH_1",
+				FilterIDs: []string{"FLTR_1"},
+				ActivationInterval: &TPActivationInterval{
+					ActivationTime: "2026-03-14T14:35:00Z",
+					ExpiryTime:     "",
+				},
+				MaxHits:   12,
+				MinHits:   10,
+				MinSleep:  "2s",
+				Blocker:   false,
+				Weight:    20.0,
+				ActionIDs: []string{"WARN3", "LOG"},
+				Async:     true,
+			},
+		},
+		{
+			name:               "Nil TPThresholdProfile",
+			tpthresholdProfile: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpthresholdProfile.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpthresholdProfile) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpthresholdProfile)
+			}
+
+			if result != nil && result == tt.tpthresholdProfile {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.tpthresholdProfile.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.tpthresholdProfile) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.tpthresholdProfile)
+			}
+			if cache != nil && tt.tpthresholdProfile != nil {
+				if cache == tt.tpthresholdProfile {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+			_, ok := cache.(*TPThresholdProfile)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPThresholdProfile", cache)
+				return
+			}
+		})
+	}
+}
+
+func TestTPFilterProfile_Clone(t *testing.T) {
+	tests := []struct {
+		name            string
+		tpfilterProfile *TPFilterProfile
+	}{
+		{
+			name: "Complete TPFilterProfile",
+			tpfilterProfile: &TPFilterProfile{
+				TPid:   "TEST_TPID",
+				Tenant: "tenant1",
+				ID:     "FLTR_1",
+				Filters: []*TPFilter{
+					{
+						Element: "Account",
+						Type:    MetaString,
+						Values:  []string{"test"},
+					},
+				},
+				ActivationInterval: &TPActivationInterval{
+					ActivationTime: "2026-03-29T15:00:00Z",
+				},
+			},
+		},
+		{
+			name:            "Nil TPFilterProfile",
+			tpfilterProfile: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpfilterProfile.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpfilterProfile) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpfilterProfile)
+			}
+
+			if result != nil && result == tt.tpfilterProfile {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.tpfilterProfile.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.tpfilterProfile) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.tpfilterProfile)
+			}
+			if cache != nil && tt.tpfilterProfile != nil {
+				if cache == tt.tpfilterProfile {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+			_, ok := cache.(*TPFilterProfile)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPFilterProfile", cache)
+				return
+			}
+		})
+	}
+}
+
+func TestTPFilter_Clone(t *testing.T) {
+	tests := []struct {
+		name     string
+		tpfilter *TPFilter
+	}{
+		{
+			name: "Complete TPFilter",
+			tpfilter: &TPFilter{
+				Type:    MetaString,
+				Element: "Account",
+				Values:  []string{"1001", "1002"},
+			},
+		},
+		{
+			name:     "Nil TPFilter",
+			tpfilter: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpfilter.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpfilter) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpfilter)
+			}
+
+			if result != nil && result == tt.tpfilter {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+	}
+}
+
+func TestTPRoute_Clone(t *testing.T) {
+	tests := []struct {
+		name    string
+		tpRoute *TPRoute
+	}{
+		{
+			name: "Complete TPRoute",
+			tpRoute: &TPRoute{
+				ID:              "supplier1",
+				FilterIDs:       []string{"FLTR_1"},
+				AccountIDs:      []string{"Acc1", "Acc2"},
+				RatingPlanIDs:   []string{"RPL_1"},
+				ResourceIDs:     []string{"ResGroup1"},
+				StatIDs:         []string{"Stat1"},
+				Weight:          10,
+				Blocker:         false,
+				RouteParameters: "SortingParam1",
+			},
+		},
+		{
+			name:    "Nil TPRoute",
+			tpRoute: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpRoute.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpRoute) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpRoute)
+			}
+
+			if result != nil && result == tt.tpRoute {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+	}
+}
+
+func TestTPRouteProfile_Clone(t *testing.T) {
+	tests := []struct {
+		name           string
+		tprouteProfile *TPRouteProfile
+	}{
+		{
+			name: "Complete TPRouteProfile",
+			tprouteProfile: &TPRouteProfile{
+				TPid:      "TP1",
+				Tenant:    "tenant1",
+				ID:        "SUPL_1",
+				FilterIDs: []string{"FltrRoute"},
+				ActivationInterval: &TPActivationInterval{
+					ActivationTime: "2026-03-29T15:00:00Z",
+				},
+				Sorting:           "*weight",
+				SortingParameters: []string{"srtPrm1"},
+				Routes: []*TPRoute{
+					{
+						ID:              "supplier1",
+						StatIDs:         []string{"Stat1"},
+						Weight:          10,
+						Blocker:         false,
+						RouteParameters: "SortingParam1",
+					},
+				},
+				Weight: 20,
+			},
+		},
+		{
+			name:           "Nil TPRouteProfile",
+			tprouteProfile: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tprouteProfile.Clone()
+
+			if !reflect.DeepEqual(result, tt.tprouteProfile) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tprouteProfile)
+			}
+
+			if result != nil && result == tt.tprouteProfile {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.tprouteProfile.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.tprouteProfile) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.tprouteProfile)
+			}
+			if cache != nil && tt.tprouteProfile != nil {
+				if cache == tt.tprouteProfile {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+			_, ok := cache.(*TPRouteProfile)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPRouteProfile", cache)
+				return
+			}
+		})
+	}
+}
+
+func TestTPChargerProfile_Clone(t *testing.T) {
+	tests := []struct {
+		name      string
+		tpcharger *TPChargerProfile
+	}{
+		{
+			name: "Complete TPChargerProfile",
+			tpcharger: &TPChargerProfile{
+				TPid:               "TP1",
+				Tenant:             "tenant1",
+				ID:                 "id1",
+				FilterIDs:          []string{"FLTR_ACNT_dan", "FLTR_DST_DE"},
+				ActivationInterval: &TPActivationInterval{},
+				RunID:              MetaDefault,
+				AttributeIDs:       []string{"Attr1", "Attr2"},
+				Weight:             20,
+			},
+		},
+		{
+			name:      "Nil TPChargerProfile",
+			tpcharger: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpcharger.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpcharger) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpcharger)
+			}
+
+			if result != nil && result == tt.tpcharger {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+
+		})
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.tpcharger.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.tpcharger) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.tpcharger)
+			}
+			if cache != nil && tt.tpcharger != nil {
+				if cache == tt.tpcharger {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+			_, ok := cache.(*TPChargerProfile)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPChargerProfile", cache)
+				return
+			}
+		})
+	}
+}
+
+func TestTPDispatcherProfile_Clone(t *testing.T) {
+	tests := []struct {
+		name        string
+		tpdispacher *TPDispatcherProfile
+	}{
+		{
+			name: "Complete TPDispatcherProfile",
+			tpdispacher: &TPDispatcherProfile{
+				TPid:       "TP1",
+				Tenant:     "tenant1",
+				ID:         "Dsp",
+				Subsystems: []string{"*any"},
+				FilterIDs:  []string{"FLTR_ACNT_dan", "FLTR_DST_DE"},
+				Strategy:   MetaFirst,
+				ActivationInterval: &TPActivationInterval{
+					ActivationTime: "2026-03-14T14:35:00Z",
+					ExpiryTime:     "",
+				},
+				StrategyParams: []any{},
+				Weight:         20,
+				Hosts: []*TPDispatcherHostProfile{
+					{
+						ID:        "C1",
+						FilterIDs: []string{},
+						Weight:    10,
+						Params:    []any{"params1"},
+						Blocker:   false,
+					},
+				},
+			},
+		},
+		{
+			name: "Nil atributes TPDispatcherProfile",
+			tpdispacher: &TPDispatcherProfile{
+				TPid:               "tpid1",
+				Tenant:             "tenant1",
+				ID:                 "id1",
+				Subsystems:         nil,
+				FilterIDs:          nil,
+				ActivationInterval: nil,
+				Strategy:           "",
+				StrategyParams:     nil,
+				Weight:             0.2,
+				Hosts:              nil,
+			},
+		},
+		{
+			name:        "Nil case",
+			tpdispacher: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpdispacher.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpdispacher) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpdispacher)
+			}
+
+			if result != nil && result == tt.tpdispacher {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+
+		})
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.tpdispacher.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.tpdispacher) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.tpdispacher)
+			}
+			if cache != nil && tt.tpdispacher != nil {
+				if cache == tt.tpdispacher {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+			_, ok := cache.(*TPDispatcherProfile)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPDispatcherProfile", cache)
+				return
+			}
+		})
+	}
+}
+
+func TestActivationInterval_Clone(t *testing.T) {
+	tests := []struct {
+		name               string
+		activationInterval *ActivationInterval
+	}{
+		{
+			name: "Complete ActivationInterval",
+			activationInterval: &ActivationInterval{
+				ActivationTime: time.Date(2026, 3, 17, 12, 0, 0, 0, time.UTC),
+				ExpiryTime:     time.Date(2026, 3, 17, 12, 1, 0, 0, time.UTC),
+			},
+		},
+		{
+			name:               "Nil ActivationInterval",
+			activationInterval: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.activationInterval.Clone()
+
+			if !reflect.DeepEqual(result, tt.activationInterval) {
+				t.Errorf("Clone() = %v, want %v", result, tt.activationInterval)
+			}
+
+			if result != nil && result == tt.activationInterval {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+
+		})
+	}
+}
+
+func TestTPAttributeProfile_Clone(t *testing.T) {
+	tests := []struct {
+		name         string
+		tpAtrProfile *TPAttributeProfile
+	}{
+		{
+			name: "Complete TPAttributeProfile",
+			tpAtrProfile: &TPAttributeProfile{
+				TPid:      "TPip1",
+				Tenant:    "tenants_tst",
+				ID:        "ip1",
+				Contexts:  []string{"con1"},
+				FilterIDs: []string{"FLTR_1"},
+				ActivationInterval: &TPActivationInterval{
+					ActivationTime: "2026-03-18T12:00:00Z",
+					ExpiryTime:     "",
+				},
+				Attributes: []*TPAttribute{
+					{
+						FilterIDs: []string{"FLTR_1"},
+						Path:      "",
+						Value:     "val1",
+					},
+				},
+				Blocker: false,
+				Weight:  20,
+			},
+		},
+		{
+			name: "Specific nil fields for TPAttributeProfile",
+			tpAtrProfile: &TPAttributeProfile{
+				TPid:               "TPip1",
+				Tenant:             "tenants_tst",
+				ID:                 "ip1",
+				Contexts:           nil,
+				FilterIDs:          nil,
+				ActivationInterval: nil,
+				Attributes:         nil,
+				Blocker:            false,
+				Weight:             20,
+			},
+		},
+		{
+			name:         "Nil TPAttributeProfile",
+			tpAtrProfile: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpAtrProfile.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpAtrProfile) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpAtrProfile)
+			}
+
+			if result != nil && result == tt.tpAtrProfile {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.tpAtrProfile.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.tpAtrProfile) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.tpAtrProfile)
+			}
+			if cache != nil && tt.tpAtrProfile != nil {
+				if cache == tt.tpAtrProfile {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+			_, ok := cache.(*TPAttributeProfile)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPAttributeProfile", cache)
+				return
+			}
+		})
+	}
+}
+
+func TestTPDispatcherHost_Clone(t *testing.T) {
+	tests := []struct {
+		name            string
+		tpdispacherhost *TPDispatcherHost
+	}{
+		{
+			name: "Complete TPDispacherHost",
+			tpdispacherhost: &TPDispatcherHost{
+				TPid:   "TPid1",
+				Tenant: "Tenant1",
+				ID:     "ID1",
+				Conn: &TPDispatcherHostConn{
+					Address:           "127.0.0.1:6012",
+					Transport:         "*json",
+					ConnectAttempts:   3,
+					Reconnects:        5,
+					ConnectTimeout:    1 * time.Minute,
+					ReplyTimeout:      2 * time.Minute,
+					TLS:               true,
+					ClientKey:         "client_key",
+					ClientCertificate: "client_certificate",
+					CaCertificate:     "ca_certificate",
+				},
+			},
+		},
+		{
+			name:            "Nil TPDispacherHost",
+			tpdispacherhost: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpdispacherhost.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpdispacherhost) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpdispacherhost)
+			}
+
+			if result != nil && result == tt.tpdispacherhost {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.tpdispacherhost.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.tpdispacherhost) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.tpdispacherhost)
+			}
+			if cache != nil && tt.tpdispacherhost != nil {
+				if cache == tt.tpdispacherhost {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+			_, ok := cache.(*TPDispatcherHost)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPDispatcherHost", cache)
+				return
+			}
+		})
+	}
+}
+
+func TestTPDispatcherHostConn_Clone(t *testing.T) {
+	tests := []struct {
+		name          string
+		tpdispacherHC *TPDispatcherHostConn
+	}{
+		{
+			name: "Complete TPDispatcherHostConn",
+			tpdispacherHC: &TPDispatcherHostConn{
+				Address:           "127.0.0.1:6012",
+				Transport:         "*json",
+				ConnectAttempts:   3,
+				Reconnects:        5,
+				ConnectTimeout:    1 * time.Minute,
+				ReplyTimeout:      2 * time.Minute,
+				TLS:               true,
+				ClientKey:         "client_key",
+				ClientCertificate: "client_certificate",
+				CaCertificate:     "ca_certificate",
+			},
+		},
+		{
+			name:          "Nil TPDispatcherHostConn",
+			tpdispacherHC: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpdispacherHC.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpdispacherHC) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpdispacherHC)
+			}
+
+			if result != nil && result == tt.tpdispacherHC {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+
+		})
+	}
+}
+
+func TestTPIPPool_Clone(t *testing.T) {
+	tests := []struct {
+		name     string
+		tpippool *TPIPPool
+	}{
+		{
+			name: "Complete TPIPPool",
+			tpippool: &TPIPPool{
+				ID:        "id1",
+				FilterIDs: []string{"FILTER_1"},
+				Type:      "test_type",
+				Range:     "test_range",
+				Strategy:  "str",
+				Message:   "m_test",
+				Weight:    20,
+				Blocker:   false,
+			},
+		},
+		{
+			name:     "Nil TPIPPool",
+			tpippool: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpippool.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpippool) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpippool)
+			}
+
+			if result != nil && result == tt.tpippool {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+	}
+}
+
+func TestTPIPProfile_Clone(t *testing.T) {
+	tests := []struct {
+		name        string
+		tpipprofile *TPIPProfile
+	}{
+		{
+			name: "Complete TPIPProfile",
+			tpipprofile: &TPIPProfile{
+				TPid:      "TPid1",
+				Tenant:    "tenant_test",
+				ID:        "id1",
+				FilterIDs: []string{"FILTER_1"},
+				ActivationInterval: &TPActivationInterval{
+					ActivationTime: "2026-03-18T12:35:00Z",
+					ExpiryTime:     "",
+				},
+				TTL:    "test_ttl",
+				Stored: false,
+				Weight: 20,
+				Pools: []*TPIPPool{
+					{
+						ID:        "id1",
+						FilterIDs: []string{"FILTER_1"},
+						Type:      "test_type",
+						Range:     "test_range",
+						Strategy:  "str",
+						Message:   "m_test",
+						Weight:    20,
+						Blocker:   false,
+					},
+				},
+			},
+		},
+		{
+			name:        "Nil TPIPProfile",
+			tpipprofile: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpipprofile.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpipprofile) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpipprofile)
+			}
+
+			if result != nil && result == tt.tpipprofile {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+		t.Run(tt.name, func(t *testing.T) {
+			cache := tt.tpipprofile.CacheClone()
+
+			if !reflect.DeepEqual(cache, tt.tpipprofile) {
+				t.Errorf("CacheClone() = %v, want %v", cache, tt.tpipprofile)
+			}
+			if cache != nil && tt.tpipprofile != nil {
+				if cache == tt.tpipprofile {
+					t.Errorf("CacheClone() returned the same instance, expected a new instance")
+				}
+			}
+			_, ok := cache.(*TPIPProfile)
+
+			if !ok {
+				t.Errorf("CacheClone() returned type %T, want *TPIPProfile", cache)
+				return
+			}
+		})
+	}
+}
+
+func TestTPDispatcherHostProfile_Clone(t *testing.T) {
+	tests := []struct {
+		name          string
+		tpdispacherHP *TPDispatcherHostProfile
+	}{
+		{
+			name: "Complete TPDispatcherHostProfile",
+			tpdispacherHP: &TPDispatcherHostProfile{
+				ID:        "C1",
+				FilterIDs: []string{"FILTER_1"},
+				Weight:    10,
+				Params:    []any{"params1"},
+				Blocker:   false,
+			},
+		},
+		{
+			name: "Specific nil fields for TPDispatcherHostProfile",
+			tpdispacherHP: &TPDispatcherHostProfile{
+				ID:        "C1",
+				FilterIDs: nil,
+				Weight:    10,
+				Params:    nil,
+				Blocker:   false,
+			},
+		},
+		{
+			name:          "Nil TPDispatcherHostProfile",
+			tpdispacherHP: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.tpdispacherHP.Clone()
+
+			if !reflect.DeepEqual(result, tt.tpdispacherHP) {
+				t.Errorf("Clone() = %v, want %v", result, tt.tpdispacherHP)
+			}
+
+			if result != nil && result == tt.tpdispacherHP {
+				t.Errorf("Clone returned the same instance, expected a new instance")
 			}
 		})
 	}

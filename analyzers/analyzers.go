@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package analyzers
 
@@ -140,6 +125,10 @@ func (aS *AnalyzerService) logTrafic(id uint64, method string,
 type QueryArgs struct {
 	// a string based on the query language(https://blevesearch.com/docs/Query-String-Query/) that we send to bleve
 	HeaderFilters string
+	// Limit is the maximum number of results to return (maps to Bleve's Size parameter)
+	Limit int
+	// Offset is the starting position for results, used for pagination (maps to Bleve's From parameter)
+	Offset int
 	// a list of filters that we use to filter the call similar to how we filter the events
 	ContentFilters []string
 }
@@ -154,6 +143,12 @@ func (aS *AnalyzerService) V1StringQuery(ctx *context.Context, args *QueryArgs, 
 	}
 	s := bleve.NewSearchRequest(q)
 	s.Fields = []string{utils.Meta} // return all fields
+	if args.Limit > 0 {
+		s.Size = args.Limit
+	}
+	if args.Offset > 0 {
+		s.From = args.Offset
+	}
 	searchResults, err := aS.db.Search(s)
 	if err != nil {
 		return err

@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package agents
 
@@ -37,7 +22,11 @@ import (
 	"github.com/cgrates/go-diameter/diam/dict"
 )
 
-func loadDictionaries(dictsDir, componentID string) error {
+const (
+	SSN = 8388636 // Spending Status Notification Command Code
+)
+
+func loadDictionaries(dictionary *dict.Parser, dictsDir, componentID string) error {
 	fi, err := os.Stat(dictsDir)
 	if err != nil {
 		if strings.HasSuffix(err.Error(), "no such file or directory") {
@@ -60,7 +49,7 @@ func loadDictionaries(dictsDir, componentID string) error {
 		}
 		for _, filePath := range cfgFiles {
 			utils.Logger.Info(fmt.Sprintf("<%s> Loading dictionary out of file %s", componentID, filePath))
-			if err := dict.Default.LoadFile(filePath); err != nil {
+			if err := dictionary.LoadFile(filePath); err != nil {
 				return err
 			}
 		}
@@ -108,6 +97,8 @@ func diamAVPAsIface(dAVP *diam.AVP) (val any, err error) {
 		return uint32(dAVP.Data.(datatype.Unsigned32)), nil
 	case datatype.Unsigned64Type:
 		return uint64(dAVP.Data.(datatype.Unsigned64)), nil
+	case diam.GroupedAVPType:
+		return dAVP.Data.(*diam.GroupedAVP), nil
 	}
 }
 
@@ -431,7 +422,7 @@ func updateDiamMsgFromNavMap(m *diam.Message, navMp *utils.OrderedNavigableMap, 
 		if nmIt == nil {
 			continue // all attributes, not writable to diameter packet
 		}
-		path = path[:len(path)-1] // remove the last index
+		path = utils.StripTrailingIndex(path)
 		if err = messageSetAVPsWithPath(m,
 			path, nmIt.String(),
 			nmIt.NewBranch, tmz); err != nil {

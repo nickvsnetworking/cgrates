@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package agents
 
@@ -84,6 +69,7 @@ func updateDNSMsgFromNM(msg *dns.Msg, nm *utils.OrderedNavigableMap, qType uint1
 	for el := nm.GetFirstElement(); el != nil; el = el.Next() {
 		path := el.Value
 		itm, _ := nm.Field(path)
+		path = utils.StripTrailingIndex(path)
 		switch path[0] { // go for each posible field
 		case utils.DNSId:
 			var vItm int64
@@ -152,8 +138,8 @@ func updateDNSMsgFromNM(msg *dns.Msg, nm *utils.OrderedNavigableMap, qType uint1
 			}
 			msg.Rcode = int(vItm)
 		case utils.DNSQuestion:
-			if msg.Question, err = updateDnsQuestions(msg.Question, path[1:len(path)-1], itm.Data, itm.NewBranch); err != nil {
-				return fmt.Errorf("item: <%s>, err: %s", path[:len(path)-1], err.Error())
+			if msg.Question, err = updateDnsQuestions(msg.Question, path[1:], itm.Data, itm.NewBranch); err != nil {
+				return fmt.Errorf("item: <%s>, err: %s", path, err.Error())
 			}
 		case utils.DNSAnswer:
 			newBranch := itm.NewBranch ||
@@ -163,8 +149,8 @@ func updateDNSMsgFromNM(msg *dns.Msg, nm *utils.OrderedNavigableMap, qType uint1
 				msgFields = make(utils.StringSet)      // reset the fields inside since we have a new message
 				msgFields.Add(strings.Join(path, ".")) // detect new branch
 			}
-			if msg.Answer, err = updateDnsAnswer(msg.Answer, qType, qName, path[1:len(path)-1], itm.Data, newBranch); err != nil {
-				return fmt.Errorf("item: <%s>, err: %s", path[:len(path)-1], err.Error())
+			if msg.Answer, err = updateDnsAnswer(msg.Answer, qType, qName, path[1:], itm.Data, newBranch); err != nil {
+				return fmt.Errorf("item: <%s>, err: %s", path, err.Error())
 			}
 		case utils.DNSNs: //ToDO
 		case utils.DNSExtra: //ToDO
@@ -173,8 +159,8 @@ func updateDNSMsgFromNM(msg *dns.Msg, nm *utils.OrderedNavigableMap, qType uint1
 			if opts == nil {
 				opts = msg.SetEdns0(4096, false).IsEdns0()
 			}
-			if opts.Option, err = updateDnsOption(opts.Option, path[1:len(path)-1], itm.Data, itm.NewBranch); err != nil {
-				return fmt.Errorf("item: <%s>, err: %s", path[:len(path)-1], err.Error())
+			if opts.Option, err = updateDnsOption(opts.Option, path[1:], itm.Data, itm.NewBranch); err != nil {
+				return fmt.Errorf("item: <%s>, err: %s", path, err.Error())
 			}
 		default:
 		}

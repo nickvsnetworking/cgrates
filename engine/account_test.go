@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package engine
 
 import (
@@ -2184,8 +2170,8 @@ func TestAccountAsAccountDigest(t *testing.T) {
 		},
 	}
 	expectacntSummary := &AccountSummary{
-		Tenant: "cgrates.org",
-		ID:     "account1",
+		Tenant:    "cgrates.org",
+		AccountID: "account1",
 		BalanceSummaries: []*BalanceSummary{
 			{ID: "data1", Type: utils.MetaData, Value: 1204, Disabled: false},
 			{ID: "sms1", Type: utils.MetaSMS, Value: 14, Disabled: false},
@@ -2452,8 +2438,8 @@ func TestAccountSummaryFieldAsInterface(t *testing.T) {
 				Initial: 20.54,
 				Value:   1,
 			}},
-		Tenant: "tenant",
-		ID:     "accID",
+		Tenant:    "tenant",
+		AccountID: "accID",
 	}
 
 	if _, err := as.FieldAsInterface(nil); err == nil || err != utils.ErrNotFound {
@@ -2469,9 +2455,9 @@ func TestAccountSummaryFieldAsInterface(t *testing.T) {
 		t.Error(err)
 	} else if _, err = as.FieldAsInterface([]string{"Tenant", "Value"}); err == nil || err != utils.ErrNotFound {
 		t.Error(err)
-	} else if _, err = as.FieldAsInterface([]string{"ID"}); err != nil {
+	} else if _, err = as.FieldAsInterface([]string{"AccountID"}); err != nil {
 		t.Error(err)
-	} else if _, err = as.FieldAsInterface([]string{"ID", "test"}); err == nil || err != utils.ErrNotFound {
+	} else if _, err = as.FieldAsInterface([]string{"AccountID", "test"}); err == nil || err != utils.ErrNotFound {
 		t.Error(err)
 	}
 	if val, err := as.FieldAsInterface([]string{"BalanceSummaries"}); err != nil {
@@ -2821,8 +2807,8 @@ func TestAccountAsOldStructure(t *testing.T) {
 func TestAccountSummary(t *testing.T) {
 
 	as := &AccountSummary{
-		Tenant: "cgrates.org",
-		ID:     "CGRATES_1",
+		Tenant:    "cgrates.org",
+		AccountID: "CGRATES_1",
 		BalanceSummaries: BalanceSummaries{
 			&BalanceSummary{
 				ID:       "summary_1",
@@ -2846,8 +2832,8 @@ func TestAccountSummary(t *testing.T) {
 	}
 
 	asOld := &AccountSummary{
-		Tenant: "cgrates.org",
-		ID:     "CGRATES_1",
+		Tenant:    "cgrates.org",
+		AccountID: "CGRATES_1",
 		BalanceSummaries: BalanceSummaries{
 			&BalanceSummary{
 				ID:       "oldsummary_1",
@@ -2870,8 +2856,8 @@ func TestAccountSummary(t *testing.T) {
 		Disabled:      false,
 	}
 	expAs := &AccountSummary{
-		Tenant: "cgrates.org",
-		ID:     "CGRATES_1",
+		Tenant:    "cgrates.org",
+		AccountID: "CGRATES_1",
 		BalanceSummaries: BalanceSummaries{
 			&BalanceSummary{
 				ID:       "summary_1",
@@ -3029,6 +3015,62 @@ func TestAcountSetBalanceAction(t *testing.T) {
 	}
 }
 
+func TestAcountSetBalanceActionNilBalanceMap(t *testing.T) {
+	cfg := config.NewDefaultCGRConfig()
+	tmpDm := dm
+	defer func() {
+		dm = tmpDm
+	}()
+	cfg.DataDbCfg().Items = map[string]*config.ItemOpt{
+		utils.CacheSharedGroups: {
+			Limit:     3,
+			StaticTTL: true,
+		},
+	}
+	db, dErr := NewInternalDB(nil, nil, true, nil, cfg.DataDbCfg().Items)
+	if dErr != nil {
+		t.Error(dErr)
+	}
+	dm := NewDataManager(db, cfg.CacheCfg(), nil)
+	SetDataStorage(dm)
+	acc := &Account{
+		ID:         "vdf:minu",
+		BalanceMap: nil,
+	}
+	fltrs := NewFilterS(cfg, nil, nil)
+	a := &Action{
+		Balance: &BalanceFilter{
+			Uuid: utils.StringPointer("uuid1"),
+			ID:   utils.StringPointer("id"),
+			Type: utils.StringPointer("b_type"),
+			Value: &utils.ValueFormula{
+				Method: "value_method",
+			},
+			SharedGroups: utils.StringMapPointer(utils.NewStringMap("shrdGroup")),
+		},
+	}
+
+	if err := dm.dataDB.SetSharedGroupDrv(&SharedGroup{
+		Id:        "shrdGroup",
+		MemberIds: utils.StringMap{}}); err != nil {
+		t.Error(err)
+	}
+
+	expErr := "cannot find balance with uuid: <uuid1>"
+	if err = acc.setBalanceAction(a, fltrs); err != nil && err.Error() != expErr {
+		t.Error(err)
+	}
+	exp := utils.StringMap{}
+
+	if val, err := dm.dataDB.GetSharedGroupDrv("shrdGroup"); err != nil {
+		t.Error(err)
+	} else if !reflect.DeepEqual(val.MemberIds, exp) {
+		t.Errorf("expected %v,received %v", utils.ToJSON(exp), utils.ToJSON(val.MemberIds))
+	}
+	if err = acc.setBalanceAction(nil, fltrs); err == nil || err.Error() != "nil action" {
+		t.Error(err)
+	}
+}
 func TestAccGetAllBalancesForPrefixLogg(t *testing.T) {
 	tmp := Cache
 	utils.Logger.SetLogLevel(4)
@@ -3147,6 +3189,42 @@ func TestAccSetBalanceAction(t *testing.T) {
 	}
 }
 
+func TestAccSetBalanceActionNilBalanceType(t *testing.T) {
+	tmp := Cache
+	defer func() {
+		Cache = tmp
+	}()
+	a := &Action{
+		ActionType: "*topup",
+		Balance: &BalanceFilter{
+			ID:    utils.StringPointer(utils.MetaDefault),
+			Type:  nil,
+			Value: &utils.ValueFormula{Static: 10},
+			SharedGroups: &utils.StringMap{
+				"string1": true,
+			}},
+	}
+	acc := &Account{
+		ID:            "cgrates.org:account1",
+		AllowNegative: true,
+		BalanceMap: map[string]Balances{
+			utils.MetaMonetary: {
+				&Balance{
+					ID:             "voice1",
+					Weight:         20,
+					DestinationIDs: utils.StringMap{utils.MetaAny: false},
+					precision:      0,
+					SharedGroups:   utils.NewStringMap("SG_TEST"),
+					Value:          3600},
+			},
+		},
+	}
+	expErr := "missing balance type"
+	Cache.Set(utils.CacheSharedGroups, "string1", nil, []string{}, false, utils.NonTransactional)
+	if err := acc.setBalanceAction(a, nil); err != nil && err.Error() != expErr {
+		t.Error(err)
+	}
+}
 func TestAccEnableAccountAction(t *testing.T) {
 	cfg := config.NewDefaultCGRConfig()
 	tmpDm := dm
@@ -3403,10 +3481,10 @@ func TestEngineNewAccountSummaryFromJSON(t *testing.T) {
 	}{
 		{
 			name:    "Valid JSON",
-			jsonStr: `{"tenant": "cgrates.org", "id": "1234", "balanceSummaries": [], "allowNegative": false, "disabled": true}`,
+			jsonStr: `{"tenant": "cgrates.org", "accountId": "1234", "balanceSummaries": [], "allowNegative": false, "disabled": true}`,
 			want: &AccountSummary{
 				Tenant:           "cgrates.org",
-				ID:               "1234",
+				AccountID:        "1234",
 				BalanceSummaries: BalanceSummaries{},
 				AllowNegative:    false,
 				Disabled:         true,
@@ -3441,7 +3519,7 @@ func TestEngineNewAccountSummaryFromJSON(t *testing.T) {
 func TestAccountSummaryString(t *testing.T) {
 	account := &AccountSummary{
 		Tenant:        "cgrates.org",
-		ID:            "2012",
+		AccountID:     "2012",
 		AllowNegative: true,
 		Disabled:      false,
 		BalanceSummaries: BalanceSummaries{
@@ -3477,7 +3555,7 @@ func TestAccountProcessAccountSummaryField(t *testing.T) {
 			name: "Direct access for *AccountSummary (Tenant)",
 			args: args{
 				fldPath:    []string{"Tenant"},
-				accSummary: &AccountSummary{Tenant: "test_tenant", ID: "id1"},
+				accSummary: &AccountSummary{Tenant: "test_tenant", AccountID: "id1"},
 				event:      make(map[string]any),
 			},
 			want:    "test_tenant",
@@ -3557,5 +3635,307 @@ func TestAccountFieldAsInterfaceNilAccount(t *testing.T) {
 	_, err := acc.FieldAsInterface(fldPath)
 	if err != utils.ErrNotFound {
 		t.Errorf("Expected error %v, got %v", utils.ErrNotFound, err)
+	}
+}
+
+func TestAccountSummaryClone(t *testing.T) {
+	tests := []struct {
+		name       string
+		accSummary *AccountSummary
+	}{
+		{
+			name: "Complete AccountSummary",
+			accSummary: &AccountSummary{
+				Tenant:    "cgrates.org",
+				AccountID: "CGRATES_1",
+				BalanceSummaries: BalanceSummaries{
+					&BalanceSummary{
+						ID:       "summary_1",
+						UUID:     "summary_uuid",
+						Type:     "*voice",
+						Initial:  2.0,
+						Value:    12.2,
+						Disabled: true,
+					},
+					&BalanceSummary{
+						ID:       "summary_2",
+						UUID:     "summary_uuid2",
+						Type:     "*voice",
+						Initial:  4.0,
+						Value:    20.2,
+						Disabled: false,
+					},
+				},
+				AllowNegative: false,
+				Disabled:      false,
+			},
+		},
+		{
+			name: "No Tenant",
+			accSummary: &AccountSummary{
+				AccountID: "CGRATES_1",
+				BalanceSummaries: BalanceSummaries{
+					&BalanceSummary{
+						ID:       "summary_1",
+						UUID:     "summary_uuid",
+						Type:     "*voice",
+						Initial:  2.0,
+						Value:    12.2,
+						Disabled: true,
+					},
+					&BalanceSummary{
+						ID:       "summary_2",
+						UUID:     "summary_uuid2",
+						Type:     "*voice",
+						Initial:  4.0,
+						Value:    20.2,
+						Disabled: false,
+					},
+				},
+				AllowNegative: false,
+				Disabled:      false,
+			},
+		},
+		{
+			name: "Nil BalanceSummaries",
+			accSummary: &AccountSummary{
+				Tenant:           "cgrates.org",
+				AccountID:        "CGRATES_1",
+				BalanceSummaries: nil,
+				AllowNegative:    false,
+				Disabled:         false,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.accSummary.Clone()
+
+			if !reflect.DeepEqual(result, tt.accSummary) {
+				t.Errorf("Clone() = %v, want %v", result, tt.accSummary)
+			}
+
+			if result != nil && result == tt.accSummary {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+
+			if tt.accSummary.Tenant != result.Tenant {
+				t.Errorf("Expected: %v, recieved: %v", tt.accSummary.Tenant, result.Tenant)
+			}
+			if tt.accSummary.AccountID != result.AccountID {
+				t.Errorf("Expected: %v, recieved: %v", tt.accSummary.AccountID, result.AccountID)
+			}
+			if tt.accSummary.BalanceSummaries != nil {
+				if utils.ToJSON(tt.accSummary.BalanceSummaries[0]) != utils.ToJSON(result.BalanceSummaries[0]) {
+					t.Errorf("Expected: %v, recieved: %v", tt.accSummary.BalanceSummaries[0], result.BalanceSummaries[0])
+				}
+				if utils.ToJSON(tt.accSummary.BalanceSummaries[1]) != utils.ToJSON(result.BalanceSummaries[1]) {
+					t.Errorf("Expected: %v, recieved: %v", tt.accSummary.BalanceSummaries[1], result.BalanceSummaries[1])
+				}
+			}
+			if tt.accSummary.AllowNegative != result.AllowNegative {
+				t.Errorf("Expected: %v, recieved: %v", tt.accSummary.AllowNegative, result.AllowNegative)
+			}
+			if tt.accSummary.Disabled != result.Disabled {
+				t.Errorf("Expected: %v, recieved: %v", tt.accSummary.Disabled, result.Disabled)
+			}
+		})
+	}
+}
+
+func TestAccountRestoreFromBalanceSummary(t *testing.T) {
+	tests := []struct {
+		name        string
+		acc         *Account
+		bf          *BalanceFilter
+		fltrS       *FilterS
+		expectedErr string
+	}{
+		{
+			name: "Uuid match existing balance",
+			acc: &Account{
+				ID: "testId",
+				BalanceMap: map[string]Balances{
+					utils.MetaMonetary: {
+						&Balance{
+							Uuid:  "test",
+							ID:    "id",
+							Value: 10,
+							DestinationIDs: utils.StringMap{
+								"NAT": true,
+								"RET": false,
+							},
+						},
+					},
+				},
+			},
+			bf: &BalanceFilter{
+				ID:             utils.StringPointer("BALANCE_ID"),
+				Uuid:           utils.StringPointer("test"),
+				Type:           utils.StringPointer(utils.MetaVoice),
+				DestinationIDs: utils.StringMapPointer(utils.NewStringMap("GERMANY_O2")),
+			},
+			fltrS: &FilterS{
+				cfg:     config.CgrConfig(),
+				dm:      &DataManager{},
+				connMgr: &ConnManager{},
+			},
+		},
+		{
+			name: "Default Account",
+			acc:  &Account{},
+			bf: &BalanceFilter{
+				ID:             utils.StringPointer("BALANCE_ID"),
+				Type:           utils.StringPointer(utils.MetaVoice),
+				DestinationIDs: utils.StringMapPointer(utils.NewStringMap("GERMANY_O2")),
+			},
+			fltrS: &FilterS{
+				cfg:     config.CgrConfig(),
+				dm:      &DataManager{},
+				connMgr: &ConnManager{},
+			},
+		},
+		{
+			name: "Empty Ids",
+			acc: &Account{
+				BalanceMap: map[string]Balances{
+					utils.MetaMonetary: {
+						&Balance{
+							ID:    "",
+							Value: 10,
+							DestinationIDs: utils.StringMap{
+								"NAT": true,
+								"RET": false,
+							},
+							ExpirationDate: time.Now(),
+						},
+					},
+				},
+			},
+			bf: &BalanceFilter{
+				ID:             utils.StringPointer(""),
+				Type:           utils.StringPointer(utils.EmptyString),
+				DestinationIDs: utils.StringMapPointer(utils.NewStringMap("GERMANY_O2")),
+			},
+			fltrS: &FilterS{
+				cfg:     config.CgrConfig(),
+				dm:      &DataManager{},
+				connMgr: &ConnManager{},
+			},
+		},
+		{
+			name: "Nil Type",
+			acc: &Account{
+				ID: "testId",
+				BalanceMap: map[string]Balances{
+					utils.MetaMonetary: {
+						&Balance{
+							Value: 10,
+							DestinationIDs: utils.StringMap{
+								"NAT": true,
+								"RET": false,
+							},
+							ExpirationDate: time.Now(),
+						},
+					},
+				},
+			},
+			bf: &BalanceFilter{
+				ID:             utils.StringPointer("BALANCE_ID"),
+				Uuid:           utils.StringPointer("test"),
+				Type:           nil,
+				DestinationIDs: utils.StringMapPointer(utils.NewStringMap("GERMANY_O2")),
+			},
+			fltrS: &FilterS{
+				cfg:     config.CgrConfig(),
+				dm:      &DataManager{},
+				connMgr: &ConnManager{},
+			},
+			expectedErr: "missing balance type",
+		},
+		{
+			name: "With Type",
+			acc: &Account{
+				ID: "vdf:minu",
+				BalanceMap: map[string]Balances{
+					utils.MetaVoice: {
+						&Balance{
+							Uuid:           "uuid2",
+							Value:          200 * float64(time.Second),
+							DestinationIDs: utils.NewStringMap("NAT"),
+							Weight:         10,
+							SharedGroups: utils.StringMap{
+								"SharedGroups_true":  true,
+								"SharedGroups_false": false,
+							},
+						},
+						&Balance{
+							Uuid:           "uuid1",
+							Value:          100 * float64(time.Second),
+							DestinationIDs: utils.NewStringMap("RET"),
+							Weight:         20,
+						},
+					}},
+			},
+
+			bf: &BalanceFilter{
+				ID:             utils.StringPointer("BALANCE_ID"),
+				Uuid:           utils.StringPointer("test"),
+				Type:           utils.StringPointer(utils.MetaVoice),
+				DestinationIDs: utils.StringMapPointer(utils.NewStringMap("GERMANY_O2")),
+			},
+			fltrS: &FilterS{
+				cfg:     config.CgrConfig(),
+				dm:      &DataManager{},
+				connMgr: &ConnManager{},
+			},
+		},
+		{
+			name: "ID match when Uuid not found",
+			acc: &Account{
+				ID: "vdf:minu",
+				BalanceMap: map[string]Balances{
+					utils.MetaVoice: {
+						&Balance{
+							ID:             "Id1",
+							Value:          200 * float64(time.Second),
+							DestinationIDs: utils.NewStringMap("NAT"),
+							Weight:         10,
+							SharedGroups: utils.StringMap{
+								"SharedGroups_true":  true,
+								"SharedGroups_false": false,
+							},
+						},
+						&Balance{
+							ID:             "Id1",
+							Value:          100 * float64(time.Second),
+							DestinationIDs: utils.NewStringMap("RET"),
+							Weight:         20,
+						},
+					},
+				},
+			},
+
+			bf: &BalanceFilter{
+				ID:             utils.StringPointer("Id1"),
+				Uuid:           utils.StringPointer("test"),
+				Type:           utils.StringPointer(utils.MetaVoice),
+				DestinationIDs: utils.StringMapPointer(utils.NewStringMap("GERMANY_O2")),
+			},
+			fltrS: &FilterS{
+				cfg:     config.CgrConfig(),
+				dm:      &DataManager{},
+				connMgr: &ConnManager{},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+
+			err := tt.acc.restoreFromBalanceSummary(tt.bf, tt.fltrS)
+			if err != nil && err.Error() != tt.expectedErr {
+				t.Errorf("Expected: %v, recieved %v", tt.expectedErr, err)
+			}
+		})
 	}
 }

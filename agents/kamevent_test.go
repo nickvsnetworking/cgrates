@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package agents
 
 import (
@@ -551,84 +537,49 @@ func TestKameventKamSessionDisconnect(t *testing.T) {
 	}
 }
 
-func TestKameventNewKamDlgReply(t *testing.T) {
-	kamEvData := []byte(`{"Event":"dialog","Jsonrpl_body":{"Id":1,"Jsonrpc":"2.0","Result":[{"call-id":"123456","Caller":{"Tag":"tag123"},"variables":[{"cgrOriginID":"id123","cgrOriginHost":"host123"}]}]}}`)
-	expected := KamDlgReply{
-		Event: "dialog",
-		Jsonrpl_body: &kamJsonDlgBody{
-			Id:      1,
-			Jsonrpc: "2.0",
-			Result: []*kamDlgInfo{
-				{
-					CallId: "123456",
-					Caller: &kamCallerDlg{
-						Tag: "tag123",
-					},
-					Variables: []struct {
-						CgrOriginID   string `json:"cgrOriginID,omitempty"`
-						CgrOriginHost string `json:"cgrOriginHost,omitempty"`
-					}{
-						{
-							CgrOriginID:   "id123",
-							CgrOriginHost: "host123",
-						},
-					},
-				},
-			},
+func TestKamDlgInfoSessionID(t *testing.T) {
+	const defaultHost = "10.0.0.1:5060"
+	tests := []struct {
+		name     string
+		info     kamDlgInfo
+		wantHost string
+		wantID   string
+	}{
+		{
+			name:     "dlg.list nested caller",
+			info:     kamDlgInfo{CallID: "call-1", Caller: &kamCallerDlg{Tag: "ftag"}},
+			wantHost: defaultHost,
+			wantID:   "call-1;ftag",
+		},
+		{
+			name:     "variables override id and host",
+			info:     kamDlgInfo{CallID: "call-1", Caller: &kamCallerDlg{Tag: "ftag"}, Variables: []kamDlgVar{{CgrOriginID: "custom-id", CgrOriginHost: "host-2"}}},
+			wantHost: "host-2",
+			wantID:   "custom-id",
+		},
+		{
+			name:     "briefing flat from_tag",
+			info:     kamDlgInfo{CallID: "call-2", FromTag: "ftag2"},
+			wantHost: defaultHost,
+			wantID:   "call-2;ftag2",
+		},
+		{
+			name:     "briefing no tag",
+			info:     kamDlgInfo{CallID: "call-3"},
+			wantHost: defaultHost,
+			wantID:   "call-3",
 		},
 	}
-	result, err := NewKamDlgReply(kamEvData)
-	if err != nil {
-		t.Errorf("Unexpected error: %v", err)
-		return
-	}
-	expectedJSON, _ := json.Marshal(expected)
-	resultJSON, _ := json.Marshal(result)
-	if string(expectedJSON) != string(resultJSON) {
-		t.Errorf("NewKamDlgReply() returned unexpected result. Expected: %s, Got: %s", expectedJSON, resultJSON)
-	}
-	invalidData := []byte("{invalid json")
-	_, err = NewKamDlgReply(invalidData)
-	if err == nil {
-		t.Errorf("Expected error when unmarshaling invalid data. Got nil error")
-	}
-}
-
-func TestKameventStringKdr(t *testing.T) {
-	event := "dialog"
-	jsonBody := &kamJsonDlgBody{
-		Id:      1,
-		Jsonrpc: "2.0",
-		Result: []*kamDlgInfo{
-			{
-				CallId: "123456",
-				Caller: &kamCallerDlg{
-					Tag: "tag123",
-				},
-				Variables: []struct {
-					CgrOriginID   string `json:"cgrOriginID,omitempty"`
-					CgrOriginHost string `json:"cgrOriginHost,omitempty"`
-				}{
-					{
-						CgrOriginID:   "id123",
-						CgrOriginHost: "host123",
-					},
-				},
-			},
-		},
-	}
-	reply := KamDlgReply{
-		Event:        event,
-		Jsonrpl_body: jsonBody,
-	}
-	expectedJSON, err := json.Marshal(reply)
-	if err != nil {
-		t.Errorf("Unexpected error marshalling KamDlgReply: %v", err)
-		return
-	}
-	result := reply.String()
-	if result != string(expectedJSON) {
-		t.Errorf("KamDlgReply.String() returned unexpected result. Expected: %s, Got: %s", string(expectedJSON), result)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.info.sessionID(defaultHost)
+			if got.OriginHost != tt.wantHost {
+				t.Errorf("OriginHost = %q, want %q", got.OriginHost, tt.wantHost)
+			}
+			if got.OriginID != tt.wantID {
+				t.Errorf("OriginID = %q, want %q", got.OriginID, tt.wantID)
+			}
+		})
 	}
 }
 
@@ -1015,11 +966,13 @@ func TestKamEventAsMapStringInterfaceUsageKey(t *testing.T) {
 		"Key":   "value",
 	}
 	expected := map[string]any{
-		"Usage": "123s",
-		"Key":   "value",
+		"Key":         "value",
+		"RequestType": "*rated",
+		"Source":      "KamailioAgent",
+		"Usage":       "123s",
 	}
 	result := kev.AsMapStringInterface()
-	if reflect.DeepEqual(result, expected) {
+	if !reflect.DeepEqual(result, expected) {
 		t.Errorf("expected %v, got %v", expected, result)
 	}
 }

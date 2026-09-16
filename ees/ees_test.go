@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package ees
 
@@ -282,7 +267,7 @@ func TestV1ProcessEvent4(t *testing.T) {
 	}
 	eeS.exporterCache = map[string]*ltcache.Cache{
 		utils.MetaHTTPPost: ltcache.NewCache(1,
-			time.Second, false, true, []func(itmID string, value any){onCacheEvicted}),
+			time.Second, false, true, []func(itmID string, value any){onCacheEvicted}, nil),
 	}
 	newEeS, err := NewEventExporter(cfg.EEsCfg().Exporters[0], cfg, filterS, nil)
 	if err != nil {
@@ -354,7 +339,7 @@ func TestV1ProcessEventMockMetrics(t *testing.T) {
 	}
 	eeS.exporterCache = map[string]*ltcache.Cache{
 		utils.MetaHTTPPost: ltcache.NewCache(1,
-			time.Second, false, true, []func(itmID string, value any){onCacheEvicted}),
+			time.Second, false, true, []func(itmID string, value any){onCacheEvicted}, nil),
 	}
 	eeS.exporterCache[utils.MetaHTTPPost].Set("SQLExporterFull", mEe, []string{"grp1"})
 	cgrEv := &engine.CGREventWithEeIDs{

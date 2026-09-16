@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package engine
 
@@ -131,13 +116,22 @@ func (at *ActionTiming) GetNextStartTime(refTime time.Time) time.Time {
 	if !at.stCache.IsZero() {
 		return at.stCache
 	}
-	// Put action schedule time in stCache for 1 time actions
-	if at.Timing != nil && at.Timing.Timing != nil &&
-		strings.HasPrefix(at.Timing.Timing.StartTime, utils.PlusChar) {
-		tmStrTmp, _ := time.ParseDuration(strings.TrimPrefix(
-			at.Timing.Timing.StartTime, utils.PlusChar))
-		at.stCache = time.Now().Add(tmStrTmp)
-		return at.stCache
+	// Put action schedule time in stCache for 1 time actions or recurring fixed duration
+	if at.Timing != nil && at.Timing.Timing != nil {
+		var prefix string
+		var tmStrTmp time.Duration
+		if strings.HasPrefix(at.Timing.Timing.StartTime, utils.PlusChar) {
+			prefix = utils.PlusChar
+		} else if strings.HasPrefix(at.Timing.Timing.StartTime, utils.MetaRecurring) {
+			prefix = utils.MetaRecurring + utils.PlusChar
+		}
+		if prefix != "" {
+			tmStrTmp, _ = time.ParseDuration(strings.TrimPrefix(at.Timing.Timing.StartTime, prefix))
+			if tmStrTmp > 0 {
+				at.stCache = refTime.Add(tmStrTmp)
+				return at.stCache
+			}
+		}
 	}
 	rateIvl := at.Timing
 	if rateIvl == nil || rateIvl.Timing == nil {
@@ -228,8 +222,11 @@ func (at *ActionTiming) getActions() (as []*Action, err error) {
 
 // Execute will execute all actions in an action plan
 // Reports on success/fail via channel if != nil
-func (at *ActionTiming) Execute(fltrS *FilterS, originService string) (err error) {
-	at.ResetStartTimeCache()
+func (at *ActionTiming) Execute(fltrS *FilterS, originService string, thresholdSyConn *thresholdSyConn) (err error) {
+	// dont reset recurring fixed duration action plans starting with "*recurring+"
+	if at.Timing != nil && at.Timing.Timing != nil && !strings.HasPrefix(at.Timing.Timing.StartTime, utils.MetaRecurring) {
+		at.ResetStartTimeCache()
+	}
 	acts, err := at.getActions()
 	if err != nil {
 		utils.Logger.Err(fmt.Sprintf("Failed to get actions for %s: %s", at.ActionsID, err))
@@ -255,8 +252,11 @@ func (at *ActionTiming) Execute(fltrS *FilterS, originService string) (err error
 			for i, act := range acts {
 				// check action filter
 				if len(act.Filters) > 0 {
-					if pass, err := fltrS.Pass(utils.NewTenantID(accID).Tenant, act.Filters,
-						utils.MapStorage{utils.MetaReq: acc}); err != nil {
+					if pass, err := fltrS.Pass(utils.NewTenantID(accID).Tenant,
+						act.Filters, utils.MapStorage{
+							utils.MetaReq: acc,
+							utils.MetaCfg: config.CgrConfig().GetDataProvider(),
+						}); err != nil {
 						return err
 					} else if !pass {
 						continue
@@ -285,7 +285,11 @@ func (at *ActionTiming) Execute(fltrS *FilterS, originService string) (err error
 					break
 				}
 				sharedData.idx = i // set the current action index in shared data
-				if err := actionFunction(acc, act, acts, fltrS, at.ExtraData, sharedData,
+				extraData := at.ExtraData
+				if act.ActionType == utils.MetaSyPublish { // cgrEvent is not needed in ExtraData for *sy_publish
+					extraData = thresholdSyConn
+				}
+				if err := actionFunction(acc, act, acts, fltrS, extraData, sharedData,
 					newActionConnCfg(originService, act.ActionType, config.CgrConfig())); err != nil {
 					utils.Logger.Err(
 						fmt.Sprintf("Error executing action %s: %v!",
@@ -442,10 +446,19 @@ func (attr *AttrActionPlan) GetRITiming(dm *DataManager) (timing *RITiming, err 
 		}
 	}
 	timing.ID = attr.TimingID
-	timing.Years.Parse(attr.Years, ";")
-	timing.Months.Parse(attr.Months, ";")
-	timing.MonthDays.Parse(attr.MonthDays, ";")
-	timing.WeekDays.Parse(attr.WeekDays, ";")
+	if attr.Years != utils.EmptyString {
+		timing.Years.Parse(attr.Years, ";")
+	}
+	if attr.Months != utils.EmptyString {
+		timing.Months.Parse(attr.Months, ";")
+	}
+	if attr.MonthDays != utils.EmptyString {
+		timing.MonthDays.Parse(attr.MonthDays, ";")
+	}
+	if attr.WeekDays != utils.EmptyString {
+		timing.WeekDays.Parse(attr.WeekDays, ";")
+	}
+
 	if !verifyFormat(attr.Time) {
 		err = fmt.Errorf("%s:%s", utils.ErrUnsupportedFormat.Error(), attr.Time)
 		return
@@ -459,6 +472,17 @@ func (attr *AttrActionPlan) GetRITiming(dm *DataManager) (timing *RITiming, err 
 func checkDefaultTiming(tStr string) (rTm *RITiming, isDefault bool) {
 	currentTime := time.Now()
 	fmtTime := currentTime.Format("15:04:05")
+	if strings.HasPrefix(tStr, utils.MetaRecurring+utils.PlusChar) {
+		return &RITiming{
+			ID:        tStr,
+			Years:     utils.Years{},
+			Months:    utils.Months{},
+			MonthDays: utils.MonthDays{},
+			WeekDays:  utils.WeekDays{},
+			StartTime: tStr,
+			EndTime:   "",
+		}, true
+	}
 	switch tStr {
 	case utils.MetaEveryMinute:
 		return &RITiming{
@@ -546,7 +570,7 @@ func checkDefaultTiming(tStr string) (rTm *RITiming, isDefault bool) {
 
 func verifyFormat(tStr string) bool {
 	if tStr == utils.EmptyString || tStr == utils.MetaASAP ||
-		strings.HasPrefix(tStr, utils.PlusChar) {
+		strings.HasPrefix(tStr, utils.PlusChar) || strings.HasPrefix(tStr, utils.MetaRecurring+utils.PlusChar) {
 		return true
 	}
 

@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package utils
 
 import (
@@ -116,6 +102,19 @@ func TestNewErrResourceS(t *testing.T) {
 	cgrError := NewCGRError("context", "apiError", "shortError", "longError")
 	if rcv := NewErrResourceS(cgrError); rcv.Error() != "RESOURCES_ERROR:shortError" {
 		t.Errorf("Expecting: RESOURCES_ERROR:shortError, received: %+v", rcv)
+	}
+}
+
+func TestNewErrIPs(t *testing.T) {
+	cgrError := NewCGRError("context", "apiError", "shortError", "longError")
+	if rcv := NewErrIPs(cgrError); rcv.Error() != "IPS_ERROR:shortError" {
+		t.Errorf("Expecting: IPS_ERROR:shortError, received: %+v", rcv)
+	}
+}
+func TestErrInvalidTime(t *testing.T) {
+	cgrError := "errorMessage"
+	if rcv := ErrInvalidTime(cgrError); rcv.Error() != "INVALID_TIME:errorMessage" {
+		t.Errorf("Expecting: INVALID_TIME:errorMessage, received: %+v", rcv)
 	}
 }
 

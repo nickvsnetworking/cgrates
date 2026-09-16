@@ -1,23 +1,8 @@
 //go:build integration
 // +build integration
 
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package ers
 
@@ -197,6 +182,62 @@ func TestERsListenAndServeRdrEvents(t *testing.T) {
 	err := srv.ListenAndServe(stopChan, cfgRldChan)
 	if err == nil || err != utils.ErrNotFound {
 		t.Fatalf("\nExpecting <%+v>,\n Received <%+v>", utils.ErrNotFound, err)
+	}
+}
+
+func TestERsListenAndServePartialEvent(t *testing.T) {
+	cfg := config.NewDefaultCGRConfig()
+	cfg.ERsCfg().Readers = []*config.EventReaderCfg{
+		{
+			Type: utils.MetaNone,
+		},
+	}
+	fltrS := &engine.FilterS{}
+	srv := NewERService(cfg, nil, fltrS, nil)
+	stopChan := make(chan struct{}, 1)
+	cfgRldChan := make(chan struct{}, 1)
+
+	errChan := make(chan error, 1)
+	go func() {
+		errChan <- srv.ListenAndServe(stopChan, cfgRldChan)
+	}()
+
+	partialEventSent := make(chan struct{})
+	go func() {
+		srv.partialEvents <- &erEvent{
+			cgrEvent: &utils.CGREvent{
+				Tenant: "cgrates.org",
+				ID:     "id",
+				Event: map[string]any{
+					utils.OriginID: "orgid",
+				},
+			},
+			rdrCfg: &config.EventReaderCfg{
+				ID: "rdrid",
+				Flags: map[string]utils.FlagParams{
+					utils.MetaNone: map[string][]string{},
+				},
+				Opts: &config.EventReaderOpts{},
+			},
+		}
+		close(partialEventSent)
+	}()
+
+	select {
+	case <-partialEventSent:
+	case <-time.After(1 * time.Second):
+		t.Fatal("timeout sending partial event to ListenAndServe")
+	}
+
+	stopChan <- struct{}{}
+
+	select {
+	case err := <-errChan:
+		if err != nil {
+			t.Fatalf("\nExpecting <%+v>,\n Received <%+v>", nil, err)
+		}
+	case <-time.After(1 * time.Second):
+		t.Fatal("ListenAndServe blocked after processing partial event")
 	}
 }
 

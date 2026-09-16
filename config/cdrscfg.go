@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package config
 
@@ -112,7 +97,8 @@ func (cdrscfg *CdrsCfg) loadFromJSONCfg(jsnCdrsCfg *CdrsJsonCfg) (err error) {
 		}
 	}
 	if jsnCdrsCfg.Online_cdr_exports != nil {
-		cdrscfg.OnlineCDRExports = append(cdrscfg.OnlineCDRExports, *jsnCdrsCfg.Online_cdr_exports...)
+		cdrscfg.OnlineCDRExports = make([]string, len(*jsnCdrsCfg.Online_cdr_exports))
+		copy(cdrscfg.OnlineCDRExports, *jsnCdrsCfg.Online_cdr_exports)
 	}
 	if jsnCdrsCfg.Scheduler_conns != nil {
 		cdrscfg.SchedulerConns = make([]string, len(*jsnCdrsCfg.Scheduler_conns))
@@ -232,7 +218,10 @@ func (cdrscfg *CdrsCfg) AsMapInterface() (initialMP map[string]any) {
 }
 
 // Clone returns a deep copy of CdrsCfg
-func (cdrscfg CdrsCfg) Clone() (cln *CdrsCfg) {
+func (cdrscfg *CdrsCfg) Clone() (cln *CdrsCfg) {
+	if cdrscfg == nil {
+		return nil
+	}
 	cln = &CdrsCfg{
 		Enabled:            cdrscfg.Enabled,
 		ExtraFields:        cdrscfg.ExtraFields.Clone(),

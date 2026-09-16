@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package v1
 
 import (
@@ -65,7 +51,7 @@ func (schdSv1 *SchedulerSv1) ExecuteActions(ctx *context.Context, attr *utils.At
 
 				at.SetAccountIDs(apl.AccountIDs) // copy the accounts
 				at.SetActionPlanID(apl.Id)
-				err := at.Execute(schdSv1.fltrS, utils.SchedulerS)
+				err := at.Execute(schdSv1.fltrS, utils.SchedulerS, nil)
 				if err != nil {
 					*reply = err.Error()
 					return err
@@ -110,7 +96,7 @@ func (schdSv1 *SchedulerSv1) ExecuteActions(ctx *context.Context, attr *utils.At
 			current = a0.GetNextStartTime(current)
 			if current.Before(attr.TimeEnd) || current.Equal(attr.TimeEnd) {
 				utils.Logger.Info(fmt.Sprintf("<Replay Scheduler> Executing action %s for time %v", a0.ActionsID, current))
-				err := a0.Execute(schdSv1.fltrS, utils.SchedulerS)
+				err := a0.Execute(schdSv1.fltrS, utils.SchedulerS, nil)
 				if err != nil {
 					*reply = err.Error()
 					return err
@@ -159,7 +145,7 @@ func (schdSv1 *SchedulerSv1) ExecuteActionPlans(ctx *context.Context, attr *util
 			engine.ActionTimingWeightOnlyPriorityList(apl.ActionTimings).Sort()
 			for _, at := range apl.ActionTimings {
 				at.SetAccountIDs(utils.NewStringMap(accID))
-				err := at.Execute(schdSv1.fltrS, utils.SchedulerS)
+				err := at.Execute(schdSv1.fltrS, utils.SchedulerS, nil)
 				if err != nil {
 					*reply = err.Error()
 					return err

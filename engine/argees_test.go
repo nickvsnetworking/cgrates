@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package engine
 
 import (
@@ -33,8 +19,8 @@ func TestArgEEsUnmarshalJSON(t *testing.T) {
 		RunID:     utils.MetaDefault,
 		StartTime: time.Date(2017, 1, 9, 16, 18, 21, 0, time.UTC),
 		AccountSummary: &AccountSummary{
-			Tenant: "cgrates.org",
-			ID:     "dan",
+			Tenant:    "cgrates.org",
+			AccountID: "dan",
 			BalanceSummaries: []*BalanceSummary{
 				{
 					UUID:     "8c54a9e9-d610-4c82-bcb5-a315b9a65010",
@@ -125,6 +111,109 @@ func TestArgEEsUnmarshalJSON(t *testing.T) {
 		if !reflect.DeepEqual(rcvCGREv, cgrEvWithIDs) {
 			t.Errorf("expected: %v,\nreceived: %v",
 				utils.ToJSON(cgrEvWithIDs), utils.ToJSON(rcvCGREv))
+		}
+	})
+	t.Run("Unmarshall AccountUpdate", func(t *testing.T) {
+		var cdMap map[string]any
+		if err = json.Unmarshal(cdBytes, &cdMap); err != nil {
+			t.Fatal(err)
+		}
+		acc := &Account{
+			ID: "1001",
+			BalanceMap: map[string]Balances{
+				"*monetary": {
+					&Balance{
+						ID:    "Balance1",
+						Value: 40,
+					},
+				}},
+			UnitCounters: UnitCounters{
+				"*event_connect": []*UnitCounter{
+					{
+						CounterType: "*balance",
+						Counters: CounterFilters{
+							{
+								Value:  5,
+								Filter: &BalanceFilter{},
+							},
+						},
+					}},
+				"*monetary": []*UnitCounter{
+					{
+						CounterType: "*balance",
+						Counters: CounterFilters{
+							{
+								Value:  11,
+								Filter: &BalanceFilter{},
+							},
+						},
+					},
+				},
+			},
+			ActionTriggers: ActionTriggers{
+				{
+					ThresholdType:  "*max_event_connect_counter",
+					ThresholdValue: 5,
+					ID:             "TRIGGER1",
+					Executed:       true,
+				},
+				{
+
+					ThresholdType:  "*max_balance_counter",
+					ThresholdValue: 20,
+					Recurrent:      true,
+					ID:             "TRIGGER2",
+				},
+			},
+		}
+
+		cgrEvWithIDs := CGREventWithEeIDs{
+			EeIDs: []string{"id1", "id2"},
+			CGREvent: &utils.CGREvent{
+				Tenant: "cgrates.org",
+				ID:     "ev1",
+				Event: map[string]any{
+					utils.AccountField: acc,
+					utils.EventType:    utils.AccountUpdate,
+					utils.EventSource:  utils.AccountService,
+					utils.CostDetails:  cdMap,
+				},
+			},
+		}
+
+		cgrEvBytes, err := json.Marshal(cgrEvWithIDs)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		var rcvCGREv CGREventWithEeIDs
+		if err = json.Unmarshal(cgrEvBytes, &rcvCGREv); err != nil {
+			t.Fatal(err)
+		}
+
+		cgrEvWithIDs.Event[utils.CostDetails] = testEC
+		if !reflect.DeepEqual(rcvCGREv, cgrEvWithIDs) {
+			t.Errorf("expected: %v,\nreceived: %v", utils.ToJSON(cgrEvWithIDs), utils.ToJSON(rcvCGREv))
+		}
+	})
+	t.Run("Unmarshal error", func(t *testing.T) {
+		cgrEvWithIDs := CGREventWithEeIDs{
+			CGREvent: &utils.CGREvent{
+				Event: map[string]any{
+					utils.AccountField: "`1001",
+					utils.EventType:    utils.AccountUpdate,
+				},
+			},
+		}
+		cgrEvBytes, err := json.Marshal(cgrEvWithIDs)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		expectedErr := "json: cannot unmarshal string into Go value of type engine.Account"
+		var rcvCGREv CGREventWithEeIDs
+		if err = json.Unmarshal(cgrEvBytes, &rcvCGREv); err != nil && err.Error() != expectedErr {
+			t.Errorf("Expected: %v, recieved: %v", expectedErr, err)
 		}
 	})
 }

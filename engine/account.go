@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package engine
 
@@ -104,6 +89,61 @@ func (acc *Account) getCreditForPrefix(cd *CallDescriptor) (duration time.Durati
 		duration += d
 	}
 	return
+}
+
+// restoreFromBalanceSummary restores a balance from a BalanceSummary
+func (acc *Account) restoreFromBalanceSummary(bf *BalanceFilter, fltrS *FilterS) error {
+	if acc.BalanceMap == nil {
+		acc.BalanceMap = make(map[string]Balances)
+	}
+	var balance *Balance
+	var found bool
+	// check UUID if matches first
+	if bf.Uuid != nil && *bf.Uuid != "" {
+		for balanceType := range acc.BalanceMap {
+			for _, b := range acc.BalanceMap[balanceType] {
+				if b.Uuid == *bf.Uuid && !b.IsExpiredAt(time.Now()) {
+					balance = b
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+	}
+	// fallback to ID match
+	if !found && bf.ID != nil && *bf.ID != "" {
+		for balanceType := range acc.BalanceMap {
+			if bf.Type != nil && *bf.Type != "" && balanceType != *bf.Type {
+				continue
+			}
+			for _, b := range acc.BalanceMap[balanceType] {
+				if b.ID == *bf.ID && !b.IsExpiredAt(time.Now()) {
+					balance = b
+					found = true
+					break
+				}
+			}
+			if found {
+				break
+			}
+		}
+	}
+	// create new balance if notfound
+	if !found {
+		if bf.Type == nil {
+			return errors.New("missing balance type")
+		}
+		balance = &Balance{}
+		balance.Uuid = utils.GenUUID()
+		acc.BalanceMap[*bf.Type] = append(acc.BalanceMap[*bf.Type], balance)
+	}
+	bf.ModifyBalance(balance)
+	acc.InitCounters()
+	acc.ExecuteActionTriggers(nil, fltrS)
+	return nil
 }
 
 // sets all the fields of the balance
@@ -1228,10 +1268,10 @@ func (acc *Account) AsAccountSummary() *AccountSummary {
 	idSplt := strings.Split(acc.ID, utils.ConcatenatedKeySep)
 	ad := &AccountSummary{AllowNegative: acc.AllowNegative, Disabled: acc.Disabled}
 	if len(idSplt) == 1 {
-		ad.ID = idSplt[0]
+		ad.AccountID = idSplt[0]
 	} else if len(idSplt) == 2 {
 		ad.Tenant = idSplt[0]
-		ad.ID = idSplt[1]
+		ad.AccountID = idSplt[1]
 	}
 
 	for _, balanceType := range []string{utils.MetaData, utils.MetaSMS, utils.MetaMMS, utils.MetaVoice, utils.MetaGeneric, utils.MetaMonetary} {
@@ -1300,7 +1340,7 @@ func NewAccountSummaryFromJSON(jsn string) (acntSummary *AccountSummary, err err
 // AccountSummary contains compressed information about an Account
 type AccountSummary struct {
 	Tenant           string
-	ID               string
+	AccountID        string
 	BalanceSummaries BalanceSummaries
 	AllowNegative    bool
 	Disabled         bool
@@ -1310,7 +1350,7 @@ type AccountSummary struct {
 func (as *AccountSummary) Clone() (cln *AccountSummary) {
 	cln = new(AccountSummary)
 	cln.Tenant = as.Tenant
-	cln.ID = as.ID
+	cln.AccountID = as.AccountID
 	cln.AllowNegative = as.AllowNegative
 	cln.Disabled = as.Disabled
 	if as.BalanceSummaries != nil {
@@ -1391,11 +1431,11 @@ func (as *AccountSummary) FieldAsInterface(fldPath []string) (val any, err error
 			return nil, utils.ErrNotFound
 		}
 		return as.Tenant, nil
-	case utils.ID:
+	case utils.AccountID:
 		if len(fldPath) != 1 {
 			return nil, utils.ErrNotFound
 		}
-		return as.ID, nil
+		return as.AccountID, nil
 	case utils.BalanceSummaries:
 		if len(fldPath) == 1 {
 			return as.BalanceSummaries, nil
@@ -1439,7 +1479,7 @@ func (as *AccountSummary) String() string {
 func (as *AccountSummary) AsMapInterface() map[string]any {
 	return map[string]any{
 		utils.Tenant:           as.Tenant,
-		utils.ID:               as.ID,
+		utils.AccountID:        as.AccountID,
 		utils.AllowNegative:    as.AllowNegative,
 		utils.Disabled:         as.Disabled,
 		utils.BalanceSummaries: as.BalanceSummaries,

@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package config
 
@@ -185,7 +170,6 @@ type ElsOpts struct {
 	CAPath                   *string
 	DiscoverNodesOnStart     *bool
 	DiscoverNodeInterval     *time.Duration
-	Cloud                    *bool
 	APIKey                   *string
 	CertificateFingerprint   *string
 	ServiceToken             *string
@@ -259,11 +243,12 @@ type RPCOpts struct {
 }
 
 type KafkaOpts struct {
-	Topic         *string
-	BatchSize     *int
-	TLS           *bool
-	CAPath        *string
-	SkipTLSVerify *bool
+	Topic           *string
+	Linger          *time.Duration
+	DeliveryTimeout *time.Duration
+	TLS             *bool
+	CAPath          *string
+	SkipTLSVerify   *bool
 }
 
 type EventExporterOpts struct {
@@ -301,7 +286,8 @@ type EventExporterCfg struct {
 
 // NewEventExporterCfg is a constructor for the EventExporterCfg, that is needed to initialize posters that are used by the
 // readers and HTTP exporter actions
-func NewEventExporterCfg(ID, exportType, exportPath, failedPostsDir string, attempts int, opts *EventExporterOpts) *EventExporterCfg {
+func NewEventExporterCfg(ID, exportType, exportPath, failedPostsDir string, attempts int,
+	synchronous bool, opts *EventExporterOpts) *EventExporterCfg {
 	if opts == nil {
 		opts = new(EventExporterOpts)
 	}
@@ -311,13 +297,11 @@ func NewEventExporterCfg(ID, exportType, exportPath, failedPostsDir string, atte
 		ExportPath:     exportPath,
 		FailedPostsDir: failedPostsDir,
 		Attempts:       attempts,
+		Synchronous:    synchronous,
 		Opts:           opts,
 	}
 }
 func (elsOpts *ElsOpts) loadFromJSONCfg(jsnCfg *EventExporterOptsJson) (err error) {
-	if jsnCfg.ElsCloud != nil {
-		elsOpts.Cloud = jsnCfg.ElsCloud
-	}
 	if jsnCfg.ElsAPIKey != nil {
 		elsOpts.APIKey = jsnCfg.ElsAPIKey
 	}
@@ -395,12 +379,23 @@ func (elsOpts *ElsOpts) loadFromJSONCfg(jsnCfg *EventExporterOptsJson) (err erro
 	return
 }
 
-func (kafkaOpts *KafkaOpts) loadFromJSONCfg(jsnCfg *EventExporterOptsJson) (err error) {
+func (kafkaOpts *KafkaOpts) loadFromJSONCfg(jsnCfg *EventExporterOptsJson) error {
 	if jsnCfg.KafkaTopic != nil {
 		kafkaOpts.Topic = jsnCfg.KafkaTopic
 	}
-	if jsnCfg.KafkaBatchSize != nil {
-		kafkaOpts.BatchSize = jsnCfg.KafkaBatchSize
+	if jsnCfg.KafkaLinger != nil {
+		linger, err := utils.ParseDurationWithNanosecs(*jsnCfg.KafkaLinger)
+		if err != nil {
+			return err
+		}
+		kafkaOpts.Linger = utils.DurationPointer(linger)
+	}
+	if jsnCfg.KafkaDeliveryTimeout != nil {
+		timeout, err := utils.ParseDurationWithNanosecs(*jsnCfg.KafkaDeliveryTimeout)
+		if err != nil {
+			return err
+		}
+		kafkaOpts.DeliveryTimeout = utils.DurationPointer(timeout)
 	}
 	if jsnCfg.KafkaTLS != nil {
 		kafkaOpts.TLS = jsnCfg.KafkaTLS
@@ -411,7 +406,7 @@ func (kafkaOpts *KafkaOpts) loadFromJSONCfg(jsnCfg *EventExporterOptsJson) (err 
 	if jsnCfg.KafkaSkipTLSVerify != nil {
 		kafkaOpts.SkipTLSVerify = jsnCfg.KafkaSkipTLSVerify
 	}
-	return
+	return nil
 }
 
 func (sqlOpts *SQLOpts) loadFromJSONCfg(jsnCfg *EventExporterOptsJson) (err error) {
@@ -754,10 +749,6 @@ func (elsOpts *ElsOpts) Clone() *ElsOpts {
 		cln.DiscoverNodeInterval = new(time.Duration)
 		*cln.DiscoverNodeInterval = *elsOpts.DiscoverNodeInterval
 	}
-	if elsOpts.Cloud != nil {
-		cln.Cloud = new(bool)
-		*cln.Cloud = *elsOpts.Cloud
-	}
 	if elsOpts.APIKey != nil {
 		cln.APIKey = new(string)
 		*cln.APIKey = *elsOpts.APIKey
@@ -815,9 +806,13 @@ func (kafkaOpts *KafkaOpts) Clone() *KafkaOpts {
 		cln.Topic = new(string)
 		*cln.Topic = *kafkaOpts.Topic
 	}
-	if kafkaOpts.BatchSize != nil {
-		cln.BatchSize = new(int)
-		*cln.BatchSize = *kafkaOpts.BatchSize
+	if kafkaOpts.Linger != nil {
+		cln.Linger = new(time.Duration)
+		*cln.Linger = *kafkaOpts.Linger
+	}
+	if kafkaOpts.DeliveryTimeout != nil {
+		cln.DeliveryTimeout = new(time.Duration)
+		*cln.DeliveryTimeout = *kafkaOpts.DeliveryTimeout
 	}
 	if kafkaOpts.TLS != nil {
 		cln.TLS = new(bool)
@@ -1033,6 +1028,9 @@ func (rpcOpts *RPCOpts) Clone() *RPCOpts {
 	return cln
 }
 func (eeOpts *EventExporterOpts) Clone() *EventExporterOpts {
+	if eeOpts == nil {
+		return nil
+	}
 	cln := &EventExporterOpts{}
 	if eeOpts.CSVFieldSeparator != nil {
 		cln.CSVFieldSeparator = new(string)
@@ -1063,7 +1061,10 @@ func (eeOpts *EventExporterOpts) Clone() *EventExporterOpts {
 }
 
 // Clone returns a deep copy of EventExporterCfg
-func (eeC EventExporterCfg) Clone() (cln *EventExporterCfg) {
+func (eeC *EventExporterCfg) Clone() (cln *EventExporterCfg) {
+	if eeC == nil {
+		return nil
+	}
 	cln = &EventExporterCfg{
 		ID:                   eeC.ID,
 		Type:                 eeC.Type,
@@ -1144,9 +1145,6 @@ func (eeC *EventExporterCfg) AsMapInterface(separator string) (initialMP map[str
 		if elsOpts.DiscoverNodeInterval != nil {
 			opts[utils.ElsDiscoverNodeInterval] = *elsOpts.DiscoverNodeInterval
 		}
-		if elsOpts.Cloud != nil {
-			opts[utils.ElsCloud] = *elsOpts.Cloud
-		}
 		if elsOpts.APIKey != nil {
 			opts[utils.ElsAPIKey] = *elsOpts.APIKey
 		}
@@ -1216,8 +1214,11 @@ func (eeC *EventExporterCfg) AsMapInterface(separator string) (initialMP map[str
 		if kafkaOpts.Topic != nil {
 			opts[utils.KafkaTopic] = *kafkaOpts.Topic
 		}
-		if kafkaOpts.BatchSize != nil {
-			opts[utils.KafkaBatchSize] = *kafkaOpts.BatchSize
+		if kafkaOpts.Linger != nil {
+			opts[utils.KafkaLinger] = kafkaOpts.Linger.String()
+		}
+		if kafkaOpts.DeliveryTimeout != nil {
+			opts[utils.KafkaDeliveryTimeout] = kafkaOpts.DeliveryTimeout.String()
 		}
 		if kafkaOpts.TLS != nil {
 			opts[utils.KafkaTLS] = *kafkaOpts.TLS

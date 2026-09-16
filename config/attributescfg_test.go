@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package config
 
 import (
@@ -26,163 +12,217 @@ import (
 
 func TestAttributeSCfgloadFromJsonCfg(t *testing.T) {
 
-	jsonCfg := &AttributeSJsonCfg{
-		Enabled:               utils.BoolPointer(true),
-		Indexed_selects:       utils.BoolPointer(false),
-		Resources_conns:       &[]string{"*internal", "*conn1"},
-		Stats_conns:           &[]string{"*internal", "*conn1"},
-		Apiers_conns:          &[]string{"*internal", "*conn1"},
-		String_indexed_fields: &[]string{"*req.index1"},
-		Prefix_indexed_fields: &[]string{"*req.index1", "*req.index2"},
-		Suffix_indexed_fields: &[]string{"*req.index1"},
-		ExistsIndexedFields:   &[]string{"*req.index1"},
-		Nested_fields:         utils.BoolPointer(true),
-		Any_context:           utils.BoolPointer(true),
-		Opts: &AttributesOptsJson{
-			ProcessRuns: utils.IntPointer(1),
-			Context:     utils.StringPointer("context"),
+	tests := []struct {
+		name     string
+		jsonCfg  *AttributeSJsonCfg
+		expected *AttributeSCfg
+	}{
+		{
+			name: "With Values",
+			jsonCfg: &AttributeSJsonCfg{
+				Enabled:               utils.BoolPointer(true),
+				Indexed_selects:       utils.BoolPointer(false),
+				Resources_conns:       &[]string{"*internal", "*conn1"},
+				Stats_conns:           &[]string{"*internal", "*conn1"},
+				Apiers_conns:          &[]string{"*internal", "*conn1"},
+				String_indexed_fields: &[]string{"*req.index1"},
+				Prefix_indexed_fields: &[]string{"*req.index1", "*req.index2"},
+				Suffix_indexed_fields: &[]string{"*req.index1"},
+				ExistsIndexedFields:   &[]string{"*req.index1"},
+				Nested_fields:         utils.BoolPointer(true),
+				Any_context:           utils.BoolPointer(true),
+				Opts: &AttributesOptsJson{
+					ProcessRuns: utils.IntPointer(1),
+					Context:     utils.StringPointer("context"),
+				},
+			},
+			expected: &AttributeSCfg{
+				Enabled:             true,
+				ApierSConns:         []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaApier), "*conn1"},
+				StatSConns:          []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaStats), "*conn1"},
+				ResourceSConns:      []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaResources), "*conn1"},
+				IndexedSelects:      false,
+				StringIndexedFields: &[]string{"*req.index1"},
+				PrefixIndexedFields: &[]string{"*req.index1", "*req.index2"},
+				SuffixIndexedFields: &[]string{"*req.index1"},
+				ExistsIndexedFields: &[]string{"*req.index1"},
+				NestedFields:        true,
+				AnyContext:          true,
+				Opts: &AttributesOpts{
+					ProcessRuns: 1,
+					ProfileIDs:  []string{},
+					Context:     utils.StringPointer("context"),
+				},
+			},
+		},
+		{
+			name:     "Nil Case",
+			jsonCfg:  nil,
+			expected: nil,
 		},
 	}
-	expected := &AttributeSCfg{
-		Enabled:             true,
-		ApierSConns:         []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaApier), "*conn1"},
-		StatSConns:          []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaStats), "*conn1"},
-		ResourceSConns:      []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaResources), "*conn1"},
-		IndexedSelects:      false,
-		StringIndexedFields: &[]string{"*req.index1"},
-		PrefixIndexedFields: &[]string{"*req.index1", "*req.index2"},
-		SuffixIndexedFields: &[]string{"*req.index1"},
-		ExistsIndexedFields: &[]string{"*req.index1"},
-		NestedFields:        true,
-		AnyContext:          true,
-		Opts: &AttributesOpts{
-			ProcessRuns: 1,
-			ProfileIDs:  []string{},
-			Context:     utils.StringPointer("context"),
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			jsnCfg := NewDefaultCGRConfig()
+
+			if err := jsnCfg.attributeSCfg.loadFromJSONCfg(tt.jsonCfg); err != nil {
+				t.Error(err)
+			} else if !reflect.DeepEqual(tt.expected, jsnCfg.attributeSCfg) && tt.jsonCfg != nil {
+				t.Errorf("Expected %+v, received %+v", utils.ToJSON(tt.expected), utils.ToJSON(jsnCfg.attributeSCfg))
+			}
+		})
+	}
+}
+
+func TestAttributesOptsLoadFromJsonCfg(t *testing.T) {
+
+	tests := []struct {
+		name               string
+		attributesOptsJson *AttributesOptsJson
+	}{
+		{
+			name:               "Empty case",
+			attributesOptsJson: &AttributesOptsJson{},
+		},
+		{
+			name: "With values",
+			attributesOptsJson: &AttributesOptsJson{
+				ProcessRuns: utils.IntPointer(1),
+				Context:     utils.StringPointer("context"),
+			},
+		},
+		{
+			name:               "Nil Case",
+			attributesOptsJson: nil,
 		},
 	}
-	jsnCfg := NewDefaultCGRConfig()
-	if err := jsnCfg.attributeSCfg.loadFromJSONCfg(jsonCfg); err != nil {
-		t.Error(err)
-	} else if !reflect.DeepEqual(expected, jsnCfg.attributeSCfg) {
-		t.Errorf("Expected %+v, received %+v", utils.ToJSON(expected), utils.ToJSON(jsnCfg.attributeSCfg))
-	}
 
-	jsnCfg.attributeSCfg.Opts.loadFromJSONCfg(nil)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			want := tt.attributesOptsJson
+			jsnCfg := NewDefaultCGRConfig()
+			jsnCfg.attributeSCfg.Opts.loadFromJSONCfg(tt.attributesOptsJson)
 
-	if reflect.DeepEqual(jsnCfg.attributeSCfg.Opts, nil) {
-		t.Error("expected nil")
+			if !reflect.DeepEqual(want, tt.attributesOptsJson) {
+				t.Errorf("Expected no changes, wanted %v but got %v", want, tt.attributesOptsJson)
+			}
+		})
 	}
 }
 
 func TestAttributeSCfgAsMapInterface(t *testing.T) {
-	cfgJSONStr := `{
-"attributes": {								
-	"enabled": true,	
-	"stats_conns": ["*internal"],			
-	"resources_conns": ["*internal"],		
-	"apiers_conns": ["*internal"],			
-	"prefix_indexed_fields": ["*req.index1","*req.index2"],
-	"exists_indexed_fields": ["*req.index1","*req.index2"],
-    "string_indexed_fields": ["*req.index1"],
-	"opts": {
-		"*processRuns": 3,
-		"*context":"Context"
-	},
-},		
-}`
-	eMap := map[string]any{
-		utils.EnabledCfg:             true,
-		utils.StatSConnsCfg:          []string{utils.MetaInternal},
-		utils.ResourceSConnsCfg:      []string{utils.MetaInternal},
-		utils.ApierSConnsCfg:         []string{utils.MetaInternal},
-		utils.StringIndexedFieldsCfg: []string{"*req.index1"},
-		utils.PrefixIndexedFieldsCfg: []string{"*req.index1", "*req.index2"},
-		utils.ExistsIndexedFieldsCfg: []string{"*req.index1", "*req.index2"},
-		utils.IndexedSelectsCfg:      true,
-		utils.NestedFieldsCfg:        false,
-		utils.SuffixIndexedFieldsCfg: []string{},
-		utils.AnyContextCfg:          true,
-		utils.OptsCfg: map[string]any{
-			utils.MetaProcessRuns:             3,
-			utils.MetaProfileRuns:             0,
-			utils.MetaProfileIDs:              []string{},
-			utils.MetaProfileIgnoreFiltersCfg: false,
-			utils.OptsContext:                 "Context",
-		},
-	}
-	if cgrCfg, err := NewCGRConfigFromJSONStringWithDefaults(cfgJSONStr); err != nil {
-		t.Error(err)
-	} else if rcv := cgrCfg.attributeSCfg.AsMapInterface(); !reflect.DeepEqual(eMap, rcv) {
-		t.Errorf("Expected: %+v\n Received: %+v", utils.ToJSON(eMap), utils.ToJSON(rcv))
-	}
-}
 
-func TestAttributeSCfgAsMapInterface2(t *testing.T) {
-	cfgJSONStr := `{
-     "attributes": {
-           "suffix_indexed_fields": ["*req.index1","*req.index2"],
-           "exists_indexed_fields": ["*req.index1","*req.index2"],
-           "nested_fields": true,
-           "enabled": true,
-		   "opts": {
-			   "*processRuns": 7,
-		   },
-     },
-}`
-	expectedMap := map[string]any{
-		utils.EnabledCfg:             true,
-		utils.StatSConnsCfg:          []string{},
-		utils.ResourceSConnsCfg:      []string{},
-		utils.ApierSConnsCfg:         []string{},
-		utils.IndexedSelectsCfg:      true,
-		utils.PrefixIndexedFieldsCfg: []string{},
-		utils.SuffixIndexedFieldsCfg: []string{"*req.index1", "*req.index2"},
-		utils.ExistsIndexedFieldsCfg: []string{"*req.index1", "*req.index2"},
-		utils.NestedFieldsCfg:        true,
-		utils.AnyContextCfg:          true,
-		utils.OptsCfg: map[string]any{
-			utils.MetaProcessRuns:             7,
-			utils.MetaProfileRuns:             0,
-			utils.MetaProfileIDs:              []string{},
-			utils.MetaProfileIgnoreFiltersCfg: false,
+	tests := []struct {
+		name       string
+		cfgJSONStr string
+		eMap       map[string]any
+	}{
+		{
+			name: "With values",
+			cfgJSONStr: `{
+				"attributes": {
+					"enabled": true,
+					"stats_conns": ["*internal"],
+					"resources_conns": ["*internal"],
+					"apiers_conns": ["*internal"],
+					"prefix_indexed_fields": ["*req.index1","*req.index2"],
+					"exists_indexed_fields": ["*req.index1","*req.index2"],
+					"string_indexed_fields": ["*req.index1"],
+					"opts": {
+						"*processRuns": 3,
+						"*context":"Context"
+					},
+				},
+			}`,
+			eMap: map[string]any{
+				utils.EnabledCfg:             true,
+				utils.StatSConnsCfg:          []string{utils.MetaInternal},
+				utils.ResourceSConnsCfg:      []string{utils.MetaInternal},
+				utils.ApierSConnsCfg:         []string{utils.MetaInternal},
+				utils.StringIndexedFieldsCfg: []string{"*req.index1"},
+				utils.PrefixIndexedFieldsCfg: []string{"*req.index1", "*req.index2"},
+				utils.ExistsIndexedFieldsCfg: []string{"*req.index1", "*req.index2"},
+				utils.IndexedSelectsCfg:      true,
+				utils.NestedFieldsCfg:        false,
+				utils.SuffixIndexedFieldsCfg: []string{},
+				utils.AnyContextCfg:          true,
+				utils.OptsCfg: map[string]any{
+					utils.MetaProcessRuns:             3,
+					utils.MetaProfileRuns:             0,
+					utils.MetaProfileIDs:              []string{},
+					utils.MetaProfileIgnoreFiltersCfg: false,
+					utils.OptsContext:                 "Context",
+				},
+			},
+		},
+		{
+			name: "With nil fields",
+			cfgJSONStr: `{
+				"attributes": {
+					"suffix_indexed_fields": ["*req.index1","*req.index2"],
+					"exists_indexed_fields": ["*req.index1","*req.index2"],
+					"nested_fields": true,
+					"enabled": true,
+					"opts": {
+						"*processRuns": 7,
+					},
+				},
+			}`,
+			eMap: map[string]any{
+				utils.EnabledCfg:             true,
+				utils.StatSConnsCfg:          []string{},
+				utils.ResourceSConnsCfg:      []string{},
+				utils.ApierSConnsCfg:         []string{},
+				utils.IndexedSelectsCfg:      true,
+				utils.PrefixIndexedFieldsCfg: []string{},
+				utils.SuffixIndexedFieldsCfg: []string{"*req.index1", "*req.index2"},
+				utils.ExistsIndexedFieldsCfg: []string{"*req.index1", "*req.index2"},
+				utils.NestedFieldsCfg:        true,
+				utils.AnyContextCfg:          true,
+				utils.OptsCfg: map[string]any{
+					utils.MetaProcessRuns:             7,
+					utils.MetaProfileRuns:             0,
+					utils.MetaProfileIDs:              []string{},
+					utils.MetaProfileIgnoreFiltersCfg: false,
+				},
+			},
+		},
+		{
+			name: "Empty Case",
+			cfgJSONStr: `
+			{
+				"attributes": {}
+			}
+			`,
+			eMap: map[string]any{
+				utils.EnabledCfg:             false,
+				utils.StatSConnsCfg:          []string{},
+				utils.ResourceSConnsCfg:      []string{},
+				utils.ApierSConnsCfg:         []string{},
+				utils.IndexedSelectsCfg:      true,
+				utils.PrefixIndexedFieldsCfg: []string{},
+				utils.SuffixIndexedFieldsCfg: []string{},
+				utils.ExistsIndexedFieldsCfg: []string{},
+				utils.NestedFieldsCfg:        false,
+				utils.AnyContextCfg:          true,
+				utils.OptsCfg: map[string]any{
+					utils.MetaProcessRuns:             1,
+					utils.MetaProfileRuns:             0,
+					utils.MetaProfileIDs:              []string{},
+					utils.MetaProfileIgnoreFiltersCfg: false,
+				},
+			},
 		},
 	}
-	if cgrCfg, err := NewCGRConfigFromJSONStringWithDefaults(cfgJSONStr); err != nil {
-		t.Error(err)
-	} else if newMap := cgrCfg.attributeSCfg.AsMapInterface(); !reflect.DeepEqual(expectedMap, newMap) {
-		t.Errorf("Expected %+v \n, receieved %+v", utils.ToJSON(expectedMap), utils.ToJSON(newMap))
-	}
-}
-
-func TestAttributeSCfgAsMapInterface3(t *testing.T) {
-	myJSONStr := `
-{
-    "attributes": {}
-}
-`
-	expectedMap := map[string]any{
-		utils.EnabledCfg:             false,
-		utils.StatSConnsCfg:          []string{},
-		utils.ResourceSConnsCfg:      []string{},
-		utils.ApierSConnsCfg:         []string{},
-		utils.IndexedSelectsCfg:      true,
-		utils.PrefixIndexedFieldsCfg: []string{},
-		utils.SuffixIndexedFieldsCfg: []string{},
-		utils.ExistsIndexedFieldsCfg: []string{},
-		utils.NestedFieldsCfg:        false,
-		utils.AnyContextCfg:          true,
-		utils.OptsCfg: map[string]any{
-			utils.MetaProcessRuns:             1,
-			utils.MetaProfileRuns:             0,
-			utils.MetaProfileIDs:              []string{},
-			utils.MetaProfileIgnoreFiltersCfg: false,
-		},
-	}
-	if conv, err := NewCGRConfigFromJSONStringWithDefaults(myJSONStr); err != nil {
-		t.Error(err)
-	} else if newMap := conv.attributeSCfg.AsMapInterface(); !reflect.DeepEqual(expectedMap, newMap) {
-		t.Errorf("Expected %+v, receieved %+v", utils.ToJSON(expectedMap), utils.ToJSON(newMap))
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if cgrCfg, err := NewCGRConfigFromJSONStringWithDefaults(tt.cfgJSONStr); err != nil {
+				t.Error(err)
+			} else if rcv := cgrCfg.attributeSCfg.AsMapInterface(); !reflect.DeepEqual(tt.eMap, rcv) {
+				t.Errorf("Expected: %+v\n Received: %+v", utils.ToJSON(tt.eMap), utils.ToJSON(rcv))
+			}
+		})
 	}
 }
 
@@ -225,5 +265,44 @@ func TestAttributeSCfgClone(t *testing.T) {
 	}
 	if (*rcv.SuffixIndexedFields)[0] = ""; (*ban.SuffixIndexedFields)[0] != "*req.index1" {
 		t.Errorf("Expected clone to not modify the cloned")
+	}
+
+	ban = nil
+	rcv = ban.Clone()
+	if !reflect.DeepEqual(ban, rcv) {
+		t.Errorf("Expected: %+v\nReceived: %+v", utils.ToJSON(ban), utils.ToJSON(rcv))
+	}
+}
+
+func TestAttributesOptsClone(t *testing.T) {
+	tests := []struct {
+		name           string
+		attributesOpts *AttributesOpts
+	}{
+		{
+			name: "Complete AttributesOpts",
+			attributesOpts: &AttributesOpts{
+				ProcessRuns: 1,
+				ProfileIDs:  []string{},
+				Context:     utils.StringPointer("Context"),
+			},
+		},
+		{
+			name:           "Nil AttributesOpts",
+			attributesOpts: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.attributesOpts.Clone()
+
+			if !reflect.DeepEqual(result, tt.attributesOpts) {
+				t.Errorf("Clone() = %#+v, want %#+v", result, tt.attributesOpts)
+			}
+
+			if result != nil && result == tt.attributesOpts {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
 	}
 }

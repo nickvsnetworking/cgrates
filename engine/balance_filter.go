@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package engine
 
@@ -60,7 +45,7 @@ func NewBalanceFilter(filter map[string]any, defaultTimezone string) (*BalanceFi
 	// 	bf.Type = utils.StringPointer(utils.IfaceAsString(ty))
 	// }
 	if val, has := filter[utils.Value]; has {
-		value, err := utils.IfaceAsTFloat64(val)
+		value, err := utils.IfaceAsFloat64(val)
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +59,7 @@ func NewBalanceFilter(filter map[string]any, defaultTimezone string) (*BalanceFi
 		bf.ExpirationDate = utils.TimePointer(expTime)
 	}
 	if weight, has := filter[utils.Weight]; has {
-		value, err := utils.IfaceAsFloat64(weight)
+		value, err := utils.BalanceWeightAsFloat64(utils.IfaceAsString(weight))
 		if err != nil {
 			return nil, err
 		}
@@ -423,6 +408,9 @@ func (bf *BalanceFilter) ModifyBalance(b *Balance) {
 	}
 	if bf.TimingIDs != nil {
 		b.TimingIDs = *bf.TimingIDs
+		if len(b.TimingIDs) == 0 {
+			b.Timings = nil
+		}
 	}
 	if bf.Timings != nil && len(bf.Timings) != 0 {
 		b.Timings = make([]*RITiming, len(bf.Timings))

@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package engine
 
@@ -287,15 +272,6 @@ func TestRemoveVersions(t *testing.T) {
 	dbM := &DataDBMock{}
 	var vrs Versions = nil
 	err := dbM.RemoveVersions(vrs)
-	if err != utils.ErrNotImplemented {
-		t.Errorf("Expected error to be ErrNotImplemented, got %v", err)
-	}
-}
-
-func TestSelectDatabase(t *testing.T) {
-	dbM := &DataDBMock{}
-	dbName := "db"
-	err := dbM.SelectDatabase(dbName)
 	if err != utils.ErrNotImplemented {
 		t.Errorf("Expected error to be ErrNotImplemented, got %v", err)
 	}
@@ -1238,5 +1214,385 @@ func TestSetResourceDrv(t *testing.T) {
 	err = dbMock.SetResourceDrv(tResource)
 	if err != utils.ErrNotImplemented {
 		t.Errorf("Expected error %v but got %v", utils.ErrNotImplemented, err)
+	}
+}
+
+func TestDataDBMockGetIPProfileDrv(t *testing.T) {
+	tests := []struct {
+		name    string
+		dbm     *DataDBMock
+		want    *IPProfile
+		wantErr error
+	}{
+		{
+			name:    "Empty",
+			dbm:     &DataDBMock{},
+			want:    nil,
+			wantErr: utils.ErrNotImplemented,
+		},
+		{
+			name: "With GetIPProfileDrvF",
+			dbm: &DataDBMock{
+				GetIPProfileDrvF: func(tnt string, id string) (*IPProfile, error) {
+					return nil, utils.ErrNotImplemented
+				},
+			},
+			want:    nil,
+			wantErr: utils.ErrNotImplemented,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.dbm.GetIPProfileDrv("param1", "param2")
+			if err != nil && err != tt.wantErr {
+				t.Errorf("Expected %v recieved %v", tt.wantErr, err)
+			}
+
+			if got != tt.want {
+				t.Errorf("GetIPProfileDrv() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestDataDBMockSetIPProfileDrv(t *testing.T) {
+	tests := []struct {
+		name      string
+		dbm       *DataDBMock
+		ipProfile *IPProfile
+		wantErr   error
+	}{
+		{
+			name: "Empty",
+			dbm:  &DataDBMock{},
+			ipProfile: &IPProfile{
+				Tenant:    "cgrates.org",
+				ID:        "IPsAPI",
+				FilterIDs: []string{"*string:~*req.Account:1001"},
+				Weight:    15,
+				TTL:       -1,
+				Stored:    false,
+				Pools: []*IPPool{
+					{
+						ID:        "API_POOL",
+						FilterIDs: []string{},
+						Type:      "*ipv4",
+						Range:     "10.100.0.1/32",
+						Strategy:  "*ascending",
+						Message:   "API created pool",
+						Weight:    15,
+						Blocker:   false,
+					},
+				},
+			},
+			wantErr: utils.ErrNotImplemented,
+		},
+		{
+			name: "With SetIPProfileDrvF",
+			dbm: &DataDBMock{
+				SetIPProfileDrvF: func(ipp *IPProfile) error {
+					return utils.ErrNotImplemented
+				},
+			},
+			ipProfile: &IPProfile{
+				Tenant:    "cgrates.org",
+				ID:        "IPsAPI",
+				FilterIDs: []string{"*string:~*req.Account:1001"},
+				Weight:    15,
+				TTL:       -1,
+				Stored:    false,
+				Pools: []*IPPool{
+					{
+						ID:        "API_POOL",
+						FilterIDs: []string{},
+						Type:      "*ipv4",
+						Range:     "10.100.0.1/32",
+						Strategy:  "*ascending",
+						Message:   "API created pool",
+						Weight:    15,
+						Blocker:   false,
+					},
+				},
+			},
+			wantErr: utils.ErrNotImplemented,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.dbm.SetIPProfileDrv(tt.ipProfile)
+			if err != nil && err != tt.wantErr {
+				t.Errorf("Expected %v recieved %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestDataDBMockRemoveIPProfileDrv(t *testing.T) {
+	tests := []struct {
+		name    string
+		dbm     *DataDBMock
+		want    *IPProfile
+		wantErr error
+	}{
+		{
+			name:    "Empty",
+			dbm:     &DataDBMock{},
+			want:    nil,
+			wantErr: utils.ErrNotImplemented,
+		},
+		{
+			name: "With RemoveIPProfileDrvF",
+			dbm: &DataDBMock{
+				RemoveIPProfileDrvF: func(tnt string, id string) error {
+					return utils.ErrNotImplemented
+				},
+			},
+			want:    nil,
+			wantErr: utils.ErrNotImplemented,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.dbm.RemoveIPProfileDrv("param1", "param2")
+			if err != nil && err != tt.wantErr {
+				t.Errorf("Expected %v recieved %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestDataDBMockGetIPAllocationsDrv(t *testing.T) {
+	tests := []struct {
+		dbm     *DataDBMock
+		want    *IPAllocations
+		wantErr error
+	}{
+		{
+			dbm:     &DataDBMock{},
+			want:    nil,
+			wantErr: utils.ErrNotImplemented,
+		},
+	}
+	for _, tt := range tests {
+		got, err := tt.dbm.GetIPAllocationsDrv("param1", "param2")
+		if err != nil && err != tt.wantErr {
+			t.Errorf("Expected %v recieved %v", tt.wantErr, err)
+		}
+
+		if got != tt.want {
+			t.Errorf("Expected %v, recieved %v", tt.want, got)
+		}
+	}
+}
+
+func TestDataDBMockSetIPAllocationsDrv(t *testing.T) {
+	tests := []struct {
+		name    string
+		dbm     *DataDBMock
+		want    *IPAllocations
+		wantErr error
+	}{
+		{
+			dbm:     &DataDBMock{},
+			want:    &IPAllocations{},
+			wantErr: utils.ErrNotImplemented,
+		},
+		{
+			dbm: &DataDBMock{
+				SetIPAllocationsDrvF: func(ipp *IPAllocations) error {
+					return utils.ErrNotImplemented
+				},
+			},
+			want:    &IPAllocations{},
+			wantErr: utils.ErrNotImplemented,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.dbm.SetIPAllocationsDrv(tt.want)
+			if err != nil && err != tt.wantErr {
+				t.Errorf("Expected %v recieved %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestDataDBMockRemoveIPAllocationsDrv(t *testing.T) {
+	tests := []struct {
+		name    string
+		dbm     *DataDBMock
+		wantErr error
+	}{
+		{
+			dbm:     &DataDBMock{},
+			wantErr: utils.ErrNotImplemented,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.dbm.RemoveIPAllocationsDrv("param1", "param2")
+			if err != nil && err != tt.wantErr {
+				t.Errorf("Expected %v recieved %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestDataDBMockGetStatQueueProfileDrv(t *testing.T) {
+	tests := []struct {
+		name    string
+		dbm     *DataDBMock
+		want    *StatQueueProfile
+		wantErr error
+	}{
+		{
+			dbm:     &DataDBMock{},
+			want:    nil,
+			wantErr: utils.ErrNotImplemented,
+		},
+		{
+			dbm: &DataDBMock{
+				GetStatQueueProfileDrvF: func(tenant string, id string) (sq *StatQueueProfile, err error) {
+					return nil, utils.ErrNotImplemented
+				},
+			},
+			want:    nil,
+			wantErr: utils.ErrNotImplemented,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.dbm.GetStatQueueProfileDrv("param1", "param2")
+			if err != nil && err != tt.wantErr {
+				t.Errorf("Expected %v recieved %v", tt.wantErr, err)
+			}
+
+			if got != tt.want {
+				t.Errorf("Expected %v, recieved %v", tt.want, got)
+			}
+		})
+	}
+}
+
+func TestDataDBMockSetStatQueueProfileDrv(t *testing.T) {
+	tests := []struct {
+		name             string
+		dbm              *DataDBMock
+		statQueueProfile *StatQueueProfile
+		wantErr          error
+	}{
+		{
+			dbm: &DataDBMock{},
+			statQueueProfile: &StatQueueProfile{
+				Tenant:    "cgrates.org",
+				ID:        "Stat_1",
+				FilterIDs: []string{"FLTR_STAT_1"},
+				ActivationInterval: &utils.ActivationInterval{
+					ActivationTime: time.Date(2014, 7, 29, 15, 0, 0, 0, time.UTC),
+				},
+				QueueLength: 100,
+				TTL:         10 * time.Second,
+				MinItems:    0,
+				Metrics: []*MetricWithFilters{
+					{
+						FilterIDs: []string{"Metric_FLTR"},
+						MetricID:  "*acd",
+					},
+					{
+						FilterIDs: []string{"Metric_FLTR"},
+						MetricID:  "*tcd",
+					},
+					{
+						FilterIDs: []string{"Metric_FLTR"},
+						MetricID:  "*asr",
+					},
+				},
+				Stored:       false,
+				Blocker:      true,
+				Weight:       30,
+				ThresholdIDs: []string{"*none"},
+			},
+			wantErr: utils.ErrNotImplemented,
+		},
+		{
+			dbm: &DataDBMock{
+				SetStatQueueProfileDrvF: func(ipp *StatQueueProfile) error {
+					return utils.ErrNotImplemented
+				},
+			},
+			statQueueProfile: &StatQueueProfile{
+				Tenant:    "cgrates.org",
+				ID:        "Stat_1",
+				FilterIDs: []string{"FLTR_STAT_1"},
+				ActivationInterval: &utils.ActivationInterval{
+					ActivationTime: time.Date(2014, 7, 29, 15, 0, 0, 0, time.UTC),
+				},
+				QueueLength: 100,
+				TTL:         10 * time.Second,
+				MinItems:    0,
+				Metrics: []*MetricWithFilters{
+					{
+						FilterIDs: []string{"Metric_FLTR"},
+						MetricID:  "*acd",
+					},
+					{
+						FilterIDs: []string{"Metric_FLTR"},
+						MetricID:  "*tcd",
+					},
+					{
+						FilterIDs: []string{"Metric_FLTR"},
+						MetricID:  "*asr",
+					},
+				},
+				Stored:       false,
+				Blocker:      true,
+				Weight:       30,
+				ThresholdIDs: []string{"*none"},
+			},
+			wantErr: utils.ErrNotImplemented,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.dbm.SetStatQueueProfileDrv(tt.statQueueProfile)
+			if err != nil && err != tt.wantErr {
+				t.Errorf("Expected %v recieved %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestDataDBMockRemStatQueueProfileDrv(t *testing.T) {
+	tests := []struct {
+		name    string
+		dbm     *DataDBMock
+		tnt     string
+		id      string
+		wantErr error
+	}{
+		{
+			dbm:     &DataDBMock{},
+			tnt:     "Tenant1",
+			id:      "id1",
+			wantErr: utils.ErrNotImplemented,
+		},
+		{
+			dbm: &DataDBMock{
+				RemStatQueueProfileDrvF: func(tnt string, id string) error {
+					return utils.ErrNotImplemented
+				},
+			},
+			tnt:     "Tenant1",
+			id:      "id1",
+			wantErr: utils.ErrNotImplemented,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.dbm.RemStatQueueProfileDrv(tt.tnt, tt.id)
+			if err != nil && err != tt.wantErr {
+				t.Errorf("Expected %v recieved %v", tt.wantErr, err)
+			}
+		})
 	}
 }

@@ -1,26 +1,12 @@
 //go:build flaky
 
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package general_tests
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -32,32 +18,29 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cgrates/birpc"
 	"github.com/cgrates/birpc/context"
 	"github.com/cgrates/cgrates/config"
 	"github.com/cgrates/cgrates/ees"
 	"github.com/cgrates/cgrates/engine"
 	"github.com/cgrates/cgrates/utils"
-	"github.com/cgrates/rpcclient"
 	amqp "github.com/rabbitmq/amqp091-go"
-	kafka "github.com/segmentio/kafka-go"
+	"github.com/twmb/franz-go/pkg/kadm"
+	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 var (
 	cdrsMasterCfgPath, cdrsSlaveCfgPath string
 	cdrsMasterCfgDIR, cdrsSlaveCfgDIR   string
 	cdrsMasterCfg, cdrsSlaveCfg         *config.CGRConfig
-	cdrsMasterRpc                       *rpcclient.RPCClient
+	cdrsMasterRpc                       *birpc.Client
+	cdrsSlaveRpc                        *birpc.Client
 	httpCGRID                           = utils.UUIDSha1Prefix()
 	amqpCGRID                           = utils.UUIDSha1Prefix()
 	failoverContent                     = [][]byte{[]byte(fmt.Sprintf(`{"CGRID":"%s"}`, httpCGRID)), []byte(fmt.Sprintf(`{"CGRID":"%s"}`, amqpCGRID))}
 
 	sTestsCDRsOnExp = []func(t *testing.T){
-		testCDRsOnExpInitConfig,
-		testCDRsOnExpInitCdrDb,
-		testCDRsOnExpStartMasterEngine,
-		testCDRsOnExpStartSlaveEngine,
 		testCDRsOnExpAMQPQueuesCreation,
-		testCDRsOnExpInitMasterRPC,
 		testCDRsOnExpLoadDefaultCharger,
 		testCDRsOnExpDisableOnlineExport,
 		testCDRsOnExpHttpCdrReplication,
@@ -82,60 +65,36 @@ func TestCDRsOnExp(t *testing.T) {
 		t.Fatal("Unknown Database type")
 	}
 
+	if out, err := exec.Command("pgrep", "-a", "cgr-engine").Output(); err == nil {
+		t.Fatalf("stale cgr-engine process from a previous test: %s", bytes.TrimSpace(out))
+	}
+
+	cdrsMasterCfgPath = path.Join(*utils.DataDir, "conf", "samples", cdrsMasterCfgDIR)
+	cdrsSlaveCfgPath = path.Join(*utils.DataDir, "conf", "samples", cdrsSlaveCfgDIR)
+
+	failedDir := t.TempDir()
+	masterNG := engine.TestEngine{
+		ConfigPath: cdrsMasterCfgPath,
+		ConfigJSON: fmt.Sprintf(`{
+			"ees": {
+				"failed_posts": {"dir": "%s"},
+				"exporters": [{"id": "http_test_file", "failed_posts_dir": "%s"}]
+			}
+		}`, failedDir, failedDir),
+	}
+	cdrsMasterRpc, cdrsMasterCfg = masterNG.Run(t)
+
+	slaveNG := engine.TestEngine{
+		ConfigPath:     cdrsSlaveCfgPath,
+		PreserveDataDB: true,
+		PreserveStorDB: true,
+	}
+	cdrsSlaveRpc, cdrsSlaveCfg = slaveNG.Run(t)
+
 	for _, stest := range sTestsCDRsOnExp {
 		t.Run(*utils.DBType, stest)
 	}
 }
-
-func testCDRsOnExpInitConfig(t *testing.T) {
-	var err error
-	cdrsMasterCfgPath = path.Join(*utils.DataDir, "conf", "samples", cdrsMasterCfgDIR)
-	if cdrsMasterCfg, err = config.NewCGRConfigFromPath(cdrsMasterCfgPath); err != nil {
-		t.Fatal("Got config error: ", err.Error())
-	}
-	cdrsSlaveCfgPath = path.Join(*utils.DataDir, "conf", "samples", cdrsSlaveCfgDIR)
-	if cdrsSlaveCfg, err = config.NewCGRConfigFromPath(cdrsSlaveCfgPath); err != nil {
-		t.Fatal("Got config error: ", err.Error())
-	}
-}
-
-// InitDb so we can rely on count
-func testCDRsOnExpInitCdrDb(t *testing.T) {
-	if err := engine.InitDataDB(cdrsMasterCfg); err != nil {
-		t.Fatal(err)
-	}
-	if err := engine.InitDataDB(cdrsSlaveCfg); err != nil {
-		t.Fatal(err)
-	}
-	if err := engine.InitStorDb(cdrsMasterCfg); err != nil {
-		t.Fatal(err)
-	}
-	if err := engine.InitStorDb(cdrsSlaveCfg); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.RemoveAll(cdrsMasterCfg.EEsCfg().FailedPosts.Dir); err != nil {
-		t.Fatal("Error removing folder: ", cdrsMasterCfg.EEsCfg().FailedPosts.Dir, err)
-	}
-
-	if err := os.MkdirAll(cdrsMasterCfg.EEsCfg().FailedPosts.Dir, 0700); err != nil {
-		t.Error(err)
-	}
-
-}
-
-func testCDRsOnExpStartMasterEngine(t *testing.T) {
-	if _, err := engine.StopStartEngine(cdrsMasterCfgPath, *utils.WaitRater); err != nil {
-		t.Fatal(err)
-	}
-}
-
-func testCDRsOnExpStartSlaveEngine(t *testing.T) {
-	if _, err := engine.StartEngine(cdrsSlaveCfgPath, *utils.WaitRater); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// Create Queues dor amq
 
 func testCDRsOnExpAMQPQueuesCreation(t *testing.T) {
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
@@ -165,30 +124,15 @@ func testCDRsOnExpAMQPQueuesCreation(t *testing.T) {
 	if err = conn.Close(); err != nil {
 		t.Error(err)
 	}
-	v, err := kafka.Dial("tcp", "localhost:9092")
+	kfkCl, err := kgo.NewClient(kgo.SeedBrokers("localhost:9092"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := v.CreateTopics(kafka.TopicConfig{
-		Topic:             "cgrates_cdrs",
-		NumPartitions:     1,
-		ReplicationFactor: 1,
-	}); err != nil {
+	adm := kadm.NewClient(kfkCl)
+	if _, err := adm.CreateTopics(context.Background(), 1, 1, nil, "cgrates_cdrs"); err != nil {
 		t.Fatal(err)
 	}
-	if err = v.Close(); err != nil {
-		t.Fatal(err)
-	}
-}
-
-// Connect rpc client to rater
-func testCDRsOnExpInitMasterRPC(t *testing.T) {
-	var err error
-	cdrsMasterRpc, err = rpcclient.NewRPCClient(context.Background(), utils.TCP, cdrsMasterCfg.ListenCfg().RPCJSONListen, false, "", "", "", 1, 1,
-		0, utils.FibDuration, time.Second, 5*time.Second, rpcclient.JSONrpc, nil, false, nil)
-	if err != nil {
-		t.Fatal("Could not connect to rater: ", err.Error())
-	}
+	kfkCl.Close()
 }
 
 func testCDRsOnExpLoadDefaultCharger(t *testing.T) {
@@ -288,12 +232,6 @@ func testCDRsOnExpHttpCdrReplication(t *testing.T) {
 		t.Error("Unexpected error: ", err)
 	}
 	time.Sleep(time.Duration(*utils.WaitRater) * time.Millisecond)
-	cdrsSlaveRpc, err := rpcclient.NewRPCClient(context.Background(), utils.TCP, "127.0.0.1:12012", false, "", "", "", 1, 1,
-		0, utils.FibDuration, time.Second, 2*time.Second, rpcclient.JSONrpc, nil, false, nil)
-	if err != nil {
-		t.Fatal("Could not connect to rater: ", err.Error())
-	}
-	// ToDo: Fix cdr_http to be compatible with rest of processCdr methods
 	var rcvedCdrs []*engine.ExternalCDR
 	if err := cdrsSlaveRpc.Call(context.Background(), utils.APIerSv2GetCDRs,
 		&utils.RPCCDRsFilter{CGRIDs: []string{testCdr1.CGRID}, RunIDs: []string{utils.MetaDefault}}, &rcvedCdrs); err != nil {
@@ -368,11 +306,6 @@ func testCDRsOnExpAMQPReplication(t *testing.T) {
 		t.Error("No message received from RabbitMQ")
 	}
 	conn.Close()
-	// restart RabbitMQ server so we can test reconnects
-	if err := exec.Command("service", "rabbitmq-server", "restart").Run(); err != nil {
-		t.Error(err)
-	}
-	time.Sleep(2 * time.Second)
 	testCdr := &engine.CDR{
 		CGRID:       amqpCGRID,
 		ToR:         utils.MetaVoice,
@@ -484,30 +417,35 @@ func testCDRsOnExpFileFailover(t *testing.T) {
 }
 
 func testCDRsOnExpKafkaPosterFileFailover(t *testing.T) {
-	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: []string{"localhost:9092"},
-		Topic:   "cgrates_cdrs",
-		GroupID: "tmp",
-		MaxWait: time.Millisecond,
-	})
+	cl, err := kgo.NewClient(
+		kgo.SeedBrokers("localhost:9092"),
+		kgo.ConsumeTopics("cgrates_cdrs"),
+		kgo.ConsumerGroup("tmp"),
+		kgo.FetchMaxWait(10*time.Millisecond),
+	)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cl.Close()
 
-	defer reader.Close()
-
-	for i := 0; i < 2; i++ { // no raw CDR
+	received := 0
+	for received < 2 { // no raw CDR
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		if m, err := reader.ReadMessage(ctx); err != nil {
-			t.Fatal(err)
-		} else if !reflect.DeepEqual(failoverContent[0], m.Value) && !reflect.DeepEqual(failoverContent[1], m.Value) { // Checking just the prefix should do since some content is dynamic
-			t.Errorf("Expecting: %v or %v, received: %v", string(failoverContent[0]), string(failoverContent[1]), string(m.Value))
-		}
+		fetches := cl.PollFetches(ctx)
 		cancel()
+		if errs := fetches.Errors(); len(errs) > 0 {
+			t.Fatal(errs[0].Err)
+		}
+		fetches.EachRecord(func(r *kgo.Record) {
+			if !reflect.DeepEqual(failoverContent[0], r.Value) && !reflect.DeepEqual(failoverContent[1], r.Value) {
+				t.Errorf("Expecting: %v or %v, received: %v", string(failoverContent[0]), string(failoverContent[1]), string(r.Value))
+			}
+			received++
+		})
 	}
 }
 
 func testCDRsOnExpStopEngine(t *testing.T) {
-	if err := engine.KillEngine(100); err != nil {
-		t.Error(err)
-	}
 	conn, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
 	if err != nil {
 		t.Fatal(err)
@@ -526,4 +464,12 @@ func testCDRsOnExpStopEngine(t *testing.T) {
 	if _, err = ch.QueueDelete("queue1", false, false, true); err != nil {
 		t.Fatal(err)
 	}
+
+	kCl, err := kgo.NewClient(kgo.SeedBrokers("localhost:9092"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer kCl.Close()
+	adm := kadm.NewClient(kCl)
+	_, _ = adm.DeleteTopics(context.Background(), "cgrates_cdrs")
 }

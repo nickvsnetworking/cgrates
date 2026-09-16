@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package config
 
 import (
@@ -68,6 +54,7 @@ func TestFsAgentCfgloadFromJsonCfg1(t *testing.T) {
 func TestSessionSCfgloadFromJsonCfgCase1(t *testing.T) {
 	cfgJSON := &SessionSJsonCfg{
 		Enabled:             utils.BoolPointer(true),
+		ApierSConns:         &[]string{utils.MetaInternal, "*conn1"},
 		ChargerSConns:       &[]string{utils.MetaInternal, "*conn1"},
 		RALsConns:           &[]string{utils.MetaInternal, "*conn1"},
 		IPsConns:            &[]string{utils.MetaInternal, "*conn1"},
@@ -98,6 +85,7 @@ func TestSessionSCfgloadFromJsonCfgCase1(t *testing.T) {
 	}
 	expected := &SessionSCfg{
 		Enabled:             true,
+		ApierSConns:         []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaApier), "*conn1"},
 		ChargerSConns:       []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaChargers), "*conn1"},
 		RALsConns:           []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaResponder), "*conn1"},
 		IPsConns:            []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaIPs), "*conn1"},
@@ -114,6 +102,7 @@ func TestSessionSCfgloadFromJsonCfgCase1(t *testing.T) {
 		SessionIndexes:      utils.StringSet{},
 		ClientProtocol:      2.5,
 		ChannelSyncInterval: 10,
+		ChannelSyncTimeout:  60 * time.Second,
 		TerminateAttempts:   6,
 		AlterableFields:     utils.StringSet{},
 		MinDurLowBalance:    1,
@@ -169,6 +158,28 @@ func TestSessionSCfgloadFromJsonCfgCase5(t *testing.T) {
 	expected := "time: unknown unit \"ss\" in duration \"1ss\""
 	jsonCfg := NewDefaultCGRConfig()
 	if err := jsonCfg.sessionSCfg.loadFromJSONCfg(cfgJSON); err == nil || err.Error() != expected {
+		t.Errorf("Expected %+v, received %+v", expected, err)
+	}
+}
+
+func TestLoadFromJsonCfgStaleChanMaxExtraUsageError(t *testing.T) {
+	cfgJSON := &SessionSJsonCfg{
+		StaleChanMaxExtraUsage: utils.StringPointer("1ss"),
+	}
+	expected := `time: unknown unit "ss" in duration "1ss"`
+	jsonCfg := NewDefaultCGRConfig()
+	if err := jsonCfg.sessionSCfg.loadFromJSONCfg(cfgJSON); err == nil || err.Error() != expected {
+		t.Errorf("Expected %+v, received %+v", expected, err)
+	}
+}
+
+func TestLoadFromJsonCfgBackupIntervalError(t *testing.T) {
+	cfgJSON := &SessionSJsonCfg{
+		BackupInterval: utils.StringPointer("test"),
+	}
+	expected := `time: invalid duration "test"`
+	jsonCfg := NewDefaultCGRConfig()
+	if err := jsonCfg.sessionSCfg.loadFromJSONCfg(cfgJSON); err != nil && err.Error() != expected {
 		t.Errorf("Expected %+v, received %+v", expected, err)
 	}
 }
@@ -236,6 +247,7 @@ func TestSessionSCfgloadFromJsonCfgCase10(t *testing.T) {
 	}
 	expected := &SessionSCfg{
 		Enabled:             false,
+		ApierSConns:         []string{},
 		ChargerSConns:       []string{},
 		RALsConns:           []string{},
 		IPsConns:            []string{},
@@ -252,6 +264,7 @@ func TestSessionSCfgloadFromJsonCfgCase10(t *testing.T) {
 		SessionIndexes:      utils.StringSet{},
 		ClientProtocol:      2.0,
 		ChannelSyncInterval: 0,
+		ChannelSyncTimeout:  60 * time.Second,
 		TerminateAttempts:   5,
 		AlterableFields:     utils.StringSet{},
 		MinDurLowBalance:    0,
@@ -346,6 +359,7 @@ func TestSessionSCfgAsMapInterfaceCase1(t *testing.T) {
 }`
 	eMap := map[string]any{
 		utils.EnabledCfg:                false,
+		utils.ApierSConnsCfg:            []string{},
 		utils.ChargerSConnsCfg:          []string{},
 		utils.RALsConnsCfg:              []string{},
 		utils.CDRsConnsCfg:              []string{},
@@ -366,6 +380,7 @@ func TestSessionSCfgAsMapInterfaceCase1(t *testing.T) {
 		utils.SessionIndexesCfg:         []string{},
 		utils.ClientProtocolCfg:         2.0,
 		utils.ChannelSyncIntervalCfg:    "1s",
+		utils.ChannelSyncTimeoutCfg:     "1m0s",
 		utils.StaleChanMaxExtraUsageCfg: "10ms",
 		utils.TerminateAttemptsCfg:      5,
 		utils.MinDurLowBalanceCfg:       "0",
@@ -397,6 +412,7 @@ func TestSessionSCfgAsMapInterfaceCase2(t *testing.T) {
 	cfgJSONStr := `{
 		"sessions": {
 			"enabled": true,
+			"apiers_conns": ["*internal:*apier", "*conn1"],
 			"chargers_conns": ["*internal:*chargers", "*conn1"],
 			"rals_conns": ["*internal:*responder", "*conn1"],
 			"cdrs_conns": ["*internal:*cdrs", "*conn1"],
@@ -421,10 +437,12 @@ func TestSessionSCfgAsMapInterfaceCase2(t *testing.T) {
 				"privatekey_path": "",
 			},
 			"scheduler_conns": ["*internal:*scheduler", "*conn1"],
+			"backup_interval": "2s",
 		},
 	}`
 	eMap := map[string]any{
 		utils.EnabledCfg:                true,
+		utils.ApierSConnsCfg:            []string{utils.MetaInternal, "*conn1"},
 		utils.ChargerSConnsCfg:          []string{utils.MetaInternal, "*conn1"},
 		utils.RALsConnsCfg:              []string{utils.MetaInternal, "*conn1"},
 		utils.CDRsConnsCfg:              []string{utils.MetaInternal, "*conn1"},
@@ -442,10 +460,11 @@ func TestSessionSCfgAsMapInterfaceCase2(t *testing.T) {
 		utils.SessionIndexesCfg:         []string{},
 		utils.ClientProtocolCfg:         2.0,
 		utils.ChannelSyncIntervalCfg:    "0",
+		utils.ChannelSyncTimeoutCfg:     "1m0s",
 		utils.StaleChanMaxExtraUsageCfg: "0",
 		utils.TerminateAttemptsCfg:      10,
 		utils.AlterableFieldsCfg:        []string{},
-		utils.BackupIntervalCfg:         "0",
+		utils.BackupIntervalCfg:         "2s",
 		utils.STIRCfg: map[string]any{
 			utils.AllowedAtestCfg:       []string{"any1", "any2"},
 			utils.PayloadMaxdurationCfg: "1s",
@@ -570,6 +589,24 @@ func TestFsAgentCfgloadFromJsonCfgCase3(t *testing.T) {
 	jsonCfg := NewDefaultCGRConfig()
 	if err := jsonCfg.fsAgentCfg.loadFromJSONCfg(fsAgentJsnCfg); err == nil || err.Error() != expected {
 		t.Errorf("Expected %+v, received %+v", expected, err)
+	}
+}
+
+func TestFsAgentCfgloadFromJsonCfgCase4(t *testing.T) {
+	jsonCfg := NewDefaultCGRConfig()
+	fsAgentJsnCfg := &FreeswitchAgentJsonCfg{
+		EventSocketConns: &[]*FsConnJsonCfg{
+			{
+				Address:      utils.StringPointer("1.2.3.4:8021"),
+				Password:     utils.StringPointer("ClueCon"),
+				Reconnects:   utils.IntPointer(3),
+				ReplyTimeout: utils.StringPointer("1ss"),
+				Alias:        utils.StringPointer("123"),
+			},
+		},
+	}
+	if err := jsonCfg.fsAgentCfg.loadFromJSONCfg(fsAgentJsnCfg); err != nil {
+		t.Errorf("Received %+v", err)
 	}
 }
 
@@ -908,6 +945,12 @@ func TestAsteriskAgentCfgClone(t *testing.T) {
 	if rcv.AsteriskConns[0].User = ""; ban.AsteriskConns[0].User != "cgrates" {
 		t.Errorf("Expected clone to not modify the cloned")
 	}
+
+	ban = nil
+	rcv = ban.Clone()
+	if !reflect.DeepEqual(ban, rcv) {
+		t.Errorf("Expected: %+v\nReceived: %+v", utils.ToJSON(ban), utils.ToJSON(rcv))
+	}
 }
 
 func TestFsAgentCfgClone(t *testing.T) {
@@ -937,85 +980,149 @@ func TestFsAgentCfgClone(t *testing.T) {
 	if rcv.EventSocketConns[0].Password = ""; ban.EventSocketConns[0].Password != "ClueCon" {
 		t.Errorf("Expected clone to not modify the cloned")
 	}
-}
 
-func TestSessionSCfgClone(t *testing.T) {
-	ban := &SessionSCfg{
-		Enabled:             true,
-		ChargerSConns:       []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaChargers), "*conn1"},
-		RALsConns:           []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaResponder), "*conn1"},
-		IPsConns:            []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaIPs), "*conn1"},
-		ResourceSConns:      []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaResources), "*conn1"},
-		ThresholdSConns:     []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaThresholds), "*conn1"},
-		StatSConns:          []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaStats), "*conn1"},
-		RouteSConns:         []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaRoutes), "*conn1"},
-		AttributeSConns:     []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaAttributes), "*conn1"},
-		CDRsConns:           []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaCDRs), "*conn1"},
-		ReplicationConns:    []string{"*conn1"},
-		DebitInterval:       2,
-		StoreSCosts:         true,
-		SessionTTL:          0,
-		SessionIndexes:      utils.StringSet{},
-		ClientProtocol:      2.5,
-		ChannelSyncInterval: 10,
-		TerminateAttempts:   6,
-		AlterableFields:     utils.StringSet{},
-		MinDurLowBalance:    1,
-		SchedulerConns:      []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaScheduler), "*conn1"},
-		SessionTTLMaxDelay:  utils.DurationPointer(time.Second),
-		SessionTTLLastUsed:  utils.DurationPointer(time.Second),
-		SessionTTLUsage:     utils.DurationPointer(time.Second),
-		SessionTTLLastUsage: utils.DurationPointer(time.Second),
-		STIRCfg: &STIRcfg{
-			AllowedAttest:      utils.StringSet{utils.MetaAny: {}},
-			PayloadMaxduration: -1,
-			DefaultAttest:      "A",
-			PrivateKeyPath:     "randomPath",
-			PublicKeyPath:      "randomPath",
-		},
-		DefaultUsage: map[string]time.Duration{
-			utils.MetaAny:   3 * time.Hour,
-			utils.MetaVoice: 3 * time.Hour,
-			utils.MetaData:  1048576,
-			utils.MetaSMS:   1,
-		},
-	}
-	rcv := ban.Clone()
+	ban = nil
+	rcv = ban.Clone()
 	if !reflect.DeepEqual(ban, rcv) {
 		t.Errorf("Expected: %+v\nReceived: %+v", utils.ToJSON(ban), utils.ToJSON(rcv))
 	}
-	if rcv.ChargerSConns[1] = ""; ban.ChargerSConns[1] != "*conn1" {
-		t.Errorf("Expected clone to not modify the cloned")
-	}
+}
 
-	if rcv.RALsConns[1] = ""; ban.RALsConns[1] != "*conn1" {
-		t.Errorf("Expected clone to not modify the cloned")
+func TestSessionSCfgClone(t *testing.T) {
+	tests := []struct {
+		name        string
+		sessionSCfg *SessionSCfg
+	}{
+		{
+			name: "Complete SessionSCfg",
+			sessionSCfg: &SessionSCfg{
+				Enabled:             true,
+				ChargerSConns:       []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaChargers), "*conn1"},
+				RALsConns:           []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaResponder), "*conn1"},
+				IPsConns:            []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaIPs), "*conn1"},
+				ResourceSConns:      []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaResources), "*conn1"},
+				ThresholdSConns:     []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaThresholds), "*conn1"},
+				StatSConns:          []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaStats), "*conn1"},
+				RouteSConns:         []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaRoutes), "*conn1"},
+				AttributeSConns:     []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaAttributes), "*conn1"},
+				CDRsConns:           []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaCDRs), "*conn1"},
+				ReplicationConns:    []string{"*conn1"},
+				DebitInterval:       2,
+				StoreSCosts:         true,
+				SessionTTL:          0,
+				SessionIndexes:      utils.StringSet{},
+				ClientProtocol:      2.5,
+				ChannelSyncInterval: 10,
+				TerminateAttempts:   6,
+				AlterableFields:     utils.StringSet{},
+				MinDurLowBalance:    1,
+				SchedulerConns:      []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaScheduler), "*conn1"},
+				SessionTTLMaxDelay:  utils.DurationPointer(time.Second),
+				SessionTTLLastUsed:  utils.DurationPointer(time.Second),
+				SessionTTLUsage:     utils.DurationPointer(time.Second),
+				SessionTTLLastUsage: utils.DurationPointer(time.Second),
+				STIRCfg: &STIRcfg{
+					AllowedAttest:      utils.StringSet{utils.MetaAny: {}},
+					PayloadMaxduration: -1,
+					DefaultAttest:      "A",
+					PrivateKeyPath:     "randomPath",
+					PublicKeyPath:      "randomPath",
+				},
+				DefaultUsage: map[string]time.Duration{
+					utils.MetaAny:   3 * time.Hour,
+					utils.MetaVoice: 3 * time.Hour,
+					utils.MetaData:  1048576,
+					utils.MetaSMS:   1,
+				},
+			},
+		},
+		{
+			name: "Nil STIRRCfg",
+			sessionSCfg: &SessionSCfg{
+				Enabled:             true,
+				ChargerSConns:       []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaChargers), "*conn1"},
+				RALsConns:           []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaResponder), "*conn1"},
+				IPsConns:            []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaIPs), "*conn1"},
+				ResourceSConns:      []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaResources), "*conn1"},
+				ThresholdSConns:     []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaThresholds), "*conn1"},
+				StatSConns:          []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaStats), "*conn1"},
+				RouteSConns:         []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaRoutes), "*conn1"},
+				AttributeSConns:     []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaAttributes), "*conn1"},
+				CDRsConns:           []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaCDRs), "*conn1"},
+				ReplicationConns:    []string{"*conn1"},
+				DebitInterval:       2,
+				StoreSCosts:         true,
+				SessionTTL:          0,
+				SessionIndexes:      utils.StringSet{},
+				ClientProtocol:      2.5,
+				ChannelSyncInterval: 10,
+				TerminateAttempts:   6,
+				AlterableFields:     utils.StringSet{},
+				MinDurLowBalance:    1,
+				SchedulerConns:      []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaScheduler), "*conn1"},
+				SessionTTLMaxDelay:  utils.DurationPointer(time.Second),
+				SessionTTLLastUsed:  utils.DurationPointer(time.Second),
+				SessionTTLUsage:     utils.DurationPointer(time.Second),
+				SessionTTLLastUsage: utils.DurationPointer(time.Second),
+				STIRCfg:             nil,
+				DefaultUsage: map[string]time.Duration{
+					utils.MetaAny:   3 * time.Hour,
+					utils.MetaVoice: 3 * time.Hour,
+					utils.MetaData:  1048576,
+					utils.MetaSMS:   1,
+				},
+			},
+		},
+		{
+			name:        "Nil Case",
+			sessionSCfg: nil,
+		},
 	}
-	if rcv.IPsConns[1] = ""; ban.IPsConns[1] != "*conn1" {
-		t.Errorf("Expected clone to not modify the cloned")
-	}
-	if rcv.ResourceSConns[1] = ""; ban.ResourceSConns[1] != "*conn1" {
-		t.Errorf("Expected clone to not modify the cloned")
-	}
-	if rcv.ThresholdSConns[1] = ""; ban.ThresholdSConns[1] != "*conn1" {
-		t.Errorf("Expected clone to not modify the cloned")
-	}
-	if rcv.StatSConns[1] = ""; ban.StatSConns[1] != "*conn1" {
-		t.Errorf("Expected clone to not modify the cloned")
-	}
-	if rcv.RouteSConns[1] = ""; ban.RouteSConns[1] != "*conn1" {
-		t.Errorf("Expected clone to not modify the cloned")
-	}
-	if rcv.AttributeSConns[1] = ""; ban.AttributeSConns[1] != "*conn1" {
-		t.Errorf("Expected clone to not modify the cloned")
-	}
-	if rcv.CDRsConns[1] = ""; ban.CDRsConns[1] != "*conn1" {
-		t.Errorf("Expected clone to not modify the cloned")
-	}
-	if rcv.ReplicationConns[0] = ""; ban.ReplicationConns[0] != "*conn1" {
-		t.Errorf("Expected clone to not modify the cloned")
-	}
-	if rcv.STIRCfg.DefaultAttest = ""; ban.STIRCfg.DefaultAttest != "A" {
-		t.Errorf("Expected clone to not modify the cloned")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rcv := tt.sessionSCfg.Clone()
+			if !reflect.DeepEqual(tt.sessionSCfg, rcv) {
+				t.Errorf("Expected: %+v\nReceived: %+v", utils.ToJSON(tt.sessionSCfg), utils.ToJSON(rcv))
+			}
+
+			if tt.sessionSCfg != nil && rcv != nil {
+				if rcv.ChargerSConns[1] = ""; tt.sessionSCfg.ChargerSConns[1] != "*conn1" {
+					t.Errorf("Expected clone to not modify the cloned")
+				}
+
+				if rcv.RALsConns[1] = ""; tt.sessionSCfg.RALsConns[1] != "*conn1" {
+					t.Errorf("Expected clone to not modify the cloned")
+				}
+				if rcv.IPsConns[1] = ""; tt.sessionSCfg.IPsConns[1] != "*conn1" {
+					t.Errorf("Expected clone to not modify the cloned")
+				}
+				if rcv.ResourceSConns[1] = ""; tt.sessionSCfg.ResourceSConns[1] != "*conn1" {
+					t.Errorf("Expected clone to not modify the cloned")
+				}
+				if rcv.ThresholdSConns[1] = ""; tt.sessionSCfg.ThresholdSConns[1] != "*conn1" {
+					t.Errorf("Expected clone to not modify the cloned")
+				}
+				if rcv.StatSConns[1] = ""; tt.sessionSCfg.StatSConns[1] != "*conn1" {
+					t.Errorf("Expected clone to not modify the cloned")
+				}
+				if rcv.RouteSConns[1] = ""; tt.sessionSCfg.RouteSConns[1] != "*conn1" {
+					t.Errorf("Expected clone to not modify the cloned")
+				}
+				if rcv.AttributeSConns[1] = ""; tt.sessionSCfg.AttributeSConns[1] != "*conn1" {
+					t.Errorf("Expected clone to not modify the cloned")
+				}
+				if rcv.CDRsConns[1] = ""; tt.sessionSCfg.CDRsConns[1] != "*conn1" {
+					t.Errorf("Expected clone to not modify the cloned")
+				}
+				if rcv.ReplicationConns[0] = ""; tt.sessionSCfg.ReplicationConns[0] != "*conn1" {
+					t.Errorf("Expected clone to not modify the cloned")
+				}
+				if tt.sessionSCfg.STIRCfg != nil {
+					if rcv.STIRCfg.DefaultAttest = ""; tt.sessionSCfg.STIRCfg.DefaultAttest != "A" {
+						t.Errorf("Expected clone to not modify the cloned")
+					}
+				}
+			}
+		})
 	}
 }

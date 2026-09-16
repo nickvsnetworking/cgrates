@@ -1,23 +1,9 @@
 //go:build integration
 // +build integration
 
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package v1
 
 import (
@@ -68,9 +54,9 @@ var (
 						Value: 12.3,
 					},
 				},
-				utils.ID:       "1001",
-				utils.Tenant:   "cgrates.org",
-				utils.Disabled: false,
+				utils.AccountID: "1001",
+				utils.Tenant:    "cgrates.org",
+				utils.Disabled:  false,
 			},
 			APIOpts: map[string]any{
 				utils.MetaEventType: utils.AccountUpdate,
@@ -889,7 +875,7 @@ func testV1TSProcessAccountUpdateEvent(t *testing.T) {
 			ID:     "TH_ACNT_UPDATE_EV",
 			FilterIDs: []string{
 				"*string:~*opts.*eventType:AccountUpdate",
-				"*string:~*asm.ID:testV1TSProcessAccountUpdateEvent",
+				"*string:~*asm.AccountID:testV1TSProcessAccountUpdateEvent",
 				"*gt:~*asm.BalanceSummaries.HolidayBalance.Value:1.0",
 			},
 			MaxHits:   10,

@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package ees
 
@@ -67,7 +52,7 @@ func (httpEE *HTTPjsonMapEE) composeHeader(cgrCfg *config.CGRConfig, filterS *en
 	for el := exp.GetFirstElement(); el != nil; el = el.Next() {
 		path := el.Value
 		nmIt, _ := exp.Field(path) //Safe to ignore error, since the path always exists
-		path = path[:len(path)-1]  // remove the last index
+		path = utils.StripTrailingIndex(path)
 		hdr.Set(strings.Join(path, utils.NestingSep), nmIt.String())
 	}
 	return
@@ -102,14 +87,7 @@ func (httpEE *HTTPjsonMapEE) PrepareMap(mp *utils.CGREvent) (any, error) {
 }
 
 func (httpEE *HTTPjsonMapEE) PrepareOrderMap(mp *utils.OrderedNavigableMap) (any, error) {
-	valMp := make(map[string]any)
-	for el := mp.GetFirstElement(); el != nil; el = el.Next() {
-		path := el.Value
-		nmIt, _ := mp.Field(path)
-		path = path[:len(path)-1] // remove the last index
-		valMp[strings.Join(path, utils.NestingSep)] = nmIt.String()
-	}
-	body, err := json.Marshal(valMp)
+	body, err := json.Marshal(mp.AsMap())
 	return &HTTPPosterRequest{
 		Header: httpEE.hdr.Clone(),
 		Body:   body,

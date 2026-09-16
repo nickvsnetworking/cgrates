@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package config
 
 import (
@@ -229,6 +215,12 @@ func TestCacheCfgClone(t *testing.T) {
 	if rcv.ReplicationConns[0] = ""; cs.ReplicationConns[0] != utils.ConcatenatedKey(utils.MetaInternal, utils.MetaSessionS) {
 		t.Errorf("Expected clone to not modify the cloned")
 	}
+
+	cs = nil
+	rcv = cs.Clone()
+	if !reflect.DeepEqual(cs, rcv) {
+		t.Errorf("Expected: %+v\nReceived: %+v", utils.ToJSON(cs), utils.ToJSON(rcv))
+	}
 }
 
 func TestCacheCfgloadFromJSONCfg(t *testing.T) {
@@ -281,5 +273,41 @@ func TestCacheCfgloadFromJSONCfg(t *testing.T) {
 
 	if !reflect.DeepEqual(cCfg, exp) {
 		t.Errorf("\nexpected %s\nreceived %s\n", utils.ToJSON(exp), utils.ToJSON(cCfg))
+	}
+}
+
+func TestCacheParamCfgClone(t *testing.T) {
+	tests := []struct {
+		name          string
+		cacheParamCfg *CacheParamCfg
+	}{
+		{
+			name: "Complete CacheParamCfg",
+			cacheParamCfg: &CacheParamCfg{
+				Limit:     5,
+				TTL:       time.Second,
+				StaticTTL: true,
+				Precache:  true,
+				Remote:    false,
+				Replicate: false,
+			},
+		},
+		{
+			name:          "Nil CacheParamCfg",
+			cacheParamCfg: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.cacheParamCfg.Clone()
+
+			if !reflect.DeepEqual(result, tt.cacheParamCfg) {
+				t.Errorf("Clone() = %v, want %v", result, tt.cacheParamCfg)
+			}
+
+			if result != nil && result == tt.cacheParamCfg {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
 	}
 }

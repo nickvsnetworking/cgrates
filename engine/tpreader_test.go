@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package engine
 
@@ -1068,6 +1053,7 @@ func TestTPReaderLoadDestinationsFiltered(t *testing.T) {
 					},
 				},
 			}},
+		false,
 	)
 	tscache.Set(utils.CacheTBLTPDestinations, "itemId", &utils.TPDestination{
 		TPid: "tpID",
@@ -1228,6 +1214,7 @@ func TestTpReaderLoadAccountActions(t *testing.T) {
 					},
 				},
 			}},
+		false,
 	)
 	tscache.Set(utils.CacheTBLTPAccountActions, "*prfitemId", &utils.TPAccountActions{
 		TPid:    "tp_acc1",
@@ -1449,6 +1436,7 @@ func TestTpReaderLoadTimingsErr(t *testing.T) {
 					},
 				},
 			}},
+		false,
 	)
 	duplicateId := "id"
 	tscache.Set(utils.CacheTBLTPTimings, "*prfitemId", &utils.ApierTPTiming{
@@ -1487,6 +1475,7 @@ func TestLoadDestinationRatesErr(t *testing.T) {
 				},
 			},
 		},
+		false,
 	)
 	duplicateId := "id"
 	tscache.Set(utils.CacheTBLTPDestinationRates, "*prfdest_rate1", &utils.TPDestinationRate{
@@ -1587,6 +1576,7 @@ func TestLoadRatingProfilesFiltered(t *testing.T) {
 				},
 			},
 		},
+		false,
 	)
 	db, dErr := NewInternalDB(nil, nil, true, nil, cfg.DataDbCfg().Items)
 	if dErr != nil {
@@ -1647,6 +1637,7 @@ func TestTpReaderLoadActionTriggers(t *testing.T) {
 				StaticTTL: false,
 			},
 		},
+		false,
 	)
 	db, dErr := NewInternalDB(nil, nil, true, nil, cfg.DataDbCfg().Items)
 	if dErr != nil {
@@ -1735,6 +1726,7 @@ func TestTpReaderSetDestination(t *testing.T) {
 				StaticTTL: false,
 			},
 		},
+		false,
 	)
 	db, dErr := NewInternalDB(nil, nil, true, nil, cfg.DataDbCfg().Items)
 	if dErr != nil {
@@ -2502,5 +2494,126 @@ func TestTprLoadRatingPlansFiltered(t *testing.T) {
 	}
 	if load, err := tpr.LoadRatingPlansFiltered(""); err != nil || !load {
 		t.Error(err)
+	}
+}
+
+func TestTprLoadActionsBalanceWeightTime(t *testing.T) {
+	tests := []struct {
+		name      string
+		balWeight string
+		err       string
+	}{
+		{name: "*time_asc", balWeight: utils.MetaTimeAsc},
+		{name: "*time_desc", balWeight: utils.MetaTimeDesc},
+		{name: "number", balWeight: "15.5"},
+		{name: "invalid value", balWeight: "randomstr", err: "invalid syntax"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := config.NewDefaultCGRConfig()
+			db, err := NewInternalDB(nil, nil, true, nil, cfg.DataDbCfg().Items)
+			if err != nil {
+				t.Fatal(err)
+			}
+			tpr, err := NewTpReader(db, db, "TP1", "", nil, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			actions := &utils.TPActions{
+				TPid: "TP1",
+				ID:   "ACT_TOPUP",
+				Actions: []*utils.TPAction{
+					{
+						Identifier:    utils.MetaTopUpReset,
+						BalanceId:     "Bal1",
+						BalanceType:   utils.MetaMonetary,
+						Units:         "10",
+						ExpiryTime:    utils.MetaUnlimited,
+						BalanceWeight: tt.balWeight,
+						Weight:        10,
+					},
+				},
+			}
+			if err := db.SetTPActions([]*utils.TPActions{actions}); err != nil {
+				t.Fatal(err)
+			}
+
+			err = tpr.LoadActions()
+			if tt.err != "" {
+				if err == nil || !strings.Contains(err.Error(), tt.err) {
+					t.Errorf("expected error containing %q, got %v", tt.err, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			acts := tpr.actions["ACT_TOPUP"]
+			if len(acts) != 1 {
+				t.Fatalf("expected 1 action, got %d", len(acts))
+			}
+			a := acts[0]
+			if a.Balance.Weight == nil || *a.Balance.Weight == 0 {
+				t.Errorf("expected a weight for %q, got %v", tt.balWeight, *a.Balance.Weight)
+			}
+		})
+	}
+}
+
+func TestTPReaderLoadActionsNegatedTimingPrefix(t *testing.T) {
+	Cache.Clear(nil)
+	cfg := config.NewDefaultCGRConfig()
+	db, err := NewInternalDB(nil, nil, true, nil, cfg.DataDbCfg().Items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tpr, err := NewTpReader(db, db, "tpID", "UTC", nil, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	tpr.timings["HALF2"] = &utils.TPTiming{
+		ID:        "HALF2",
+		StartTime: "12:00:00",
+		EndTime:   "23:59:59",
+	}
+	db.db.Set(utils.CacheTBLTPActions, "tpID:actNeg", &utils.TPActions{
+		TPid: "tpID",
+		ID:   "actNeg",
+		Actions: []*utils.TPAction{
+			{
+				Identifier:  utils.MetaTopUpReset,
+				BalanceId:   "balNeg",
+				BalanceType: utils.MetaMonetary,
+				TimingTags:  "!HALF2",
+				Units:       "100",
+				ExpiryTime:  utils.MetaUnlimited,
+				Weight:      10,
+			},
+		},
+	}, []string{}, true, utils.NonTransactional)
+
+	if err := tpr.LoadActions(); err != nil {
+		t.Fatalf("LoadActions failed with negated TimingTag: %v", err)
+	}
+	acts, has := tpr.actions["actNeg"]
+	if !has {
+		t.Fatal("actNeg not found in tpr.actions")
+	}
+	if len(acts) == 0 || acts[0].Balance == nil {
+		t.Fatal("no actions or balance is nil")
+	}
+	if len(acts[0].Balance.Timings) == 0 {
+		t.Fatal("Timings is empty")
+	}
+	if acts[0].Balance.Timings[0].ID != "HALF2" {
+		t.Errorf("expected Timings[0].ID=HALF2, got %s", acts[0].Balance.Timings[0].ID)
+	}
+	if acts[0].Balance.TimingIDs == nil {
+		t.Fatal("TimingIDs is nil")
+	}
+	if v, ok := (*acts[0].Balance.TimingIDs)["HALF2"]; !ok || v != false {
+		t.Errorf("expected TimingIDs[HALF2]=false, got %v (exists: %v)", v, ok)
 	}
 }

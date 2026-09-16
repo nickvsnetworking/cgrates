@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package engine
 
@@ -401,15 +386,18 @@ func updatedIndexesWithContexts(dm *DataManager, idxItmType, tnt, itemID string,
 
 // splitFilterIndex splits the cache key so it can be used to recache the indexes
 func splitFilterIndex(tntCtxIdxKey string) (tntCtx, idxKey string, err error) {
-	splt := utils.SplitConcatenatedKey(tntCtxIdxKey) // tntCtx:filterType:fieldName:fieldVal
-	lsplt := len(splt)
-	if lsplt < 4 {
-		err = fmt.Errorf("WRONG_IDX_KEY_FORMAT<%s>", tntCtxIdxKey)
-		return
+	splt := utils.SplitConcatenatedKey(tntCtxIdxKey)
+	if len(splt) < 3 {
+		return "", "", fmt.Errorf("WRONG_IDX_KEY_FORMAT<%s>", tntCtxIdxKey)
 	}
-	tntCtx = utils.ConcatenatedKey(splt[:lsplt-3]...) // prefix may contain context/subsystems
-	idxKey = utils.ConcatenatedKey(splt[lsplt-3:]...)
-	return
+	for i := 1; i < len(splt); i++ {
+		if FilterIndexTypes.Has(splt[i]) || splt[i] == utils.MetaNone {
+			tntCtx = utils.ConcatenatedKey(splt[:i]...)
+			idxKey = utils.ConcatenatedKey(splt[i:]...)
+			return tntCtx, idxKey, nil
+		}
+	}
+	return "", "", fmt.Errorf("WRONG_IDX_KEY_FORMAT<%s>", tntCtxIdxKey)
 }
 
 // ComputeIndexes gets the indexes from the DB and ensure that the items are indexed

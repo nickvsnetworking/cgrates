@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package ees
 
 import (
@@ -23,10 +9,11 @@ import (
 	"crypto/x509"
 	"errors"
 	"os"
+	"time"
 
 	"github.com/cgrates/cgrates/config"
 	"github.com/cgrates/cgrates/utils"
-	kafka "github.com/segmentio/kafka-go"
+	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 // NewKafkaEE creates a kafka poster
@@ -43,64 +30,49 @@ func NewKafkaEE(cfg *config.EventExporterCfg, em *utils.ExporterMetrics) (*Kafka
 		topic = *opts.Topic
 	}
 
+	kgoOpts := []kgo.Opt{
+		kgo.SeedBrokers(cfg.ExportPath),
+		kgo.DefaultProduceTopic(topic),
+		kgo.DisableIdempotentWrite(),
+		kgo.RecordRetries(0),
+	}
+
+	if opts.Linger != nil {
+		kgoOpts = append(kgoOpts, kgo.ProducerLinger(*opts.Linger))
+	}
+
 	// Configure TLS if enabled.
-	var tlsCfg *tls.Config
 	if opts.TLS != nil && *opts.TLS {
-		rootCAs, err := x509.SystemCertPool()
+		tlsCfg, err := buildTLSConfig(opts.CAPath, opts.SkipTLSVerify)
 		if err != nil {
 			return nil, err
 		}
-		if rootCAs == nil {
-			rootCAs = x509.NewCertPool()
-		}
-
-		// Load additional CA certificates if a path is provided.
-		if opts.CAPath != nil && *opts.CAPath != "" {
-			ca, err := os.ReadFile(*opts.CAPath)
-			if err != nil {
-				return nil, err
-			}
-			if !rootCAs.AppendCertsFromPEM(ca) {
-				return nil, errors.New("failed to append certificates from PEM file")
-			}
-		}
-
-		tlsCfg = &tls.Config{
-			RootCAs:            rootCAs,
-			InsecureSkipVerify: opts.SkipTLSVerify != nil && *opts.SkipTLSVerify,
-		}
+		kgoOpts = append(kgoOpts, kgo.DialTLSConfig(tlsCfg))
 	}
 
-	pstr.writer = &kafka.Writer{
-		Addr:  kafka.TCP(pstr.Cfg().ExportPath),
-		Topic: topic,
-
-		// Leave it to the ExportWithAttempts function
-		// to handle the connect attempts.
-		MaxAttempts: 1,
-
-		// To handle both TLS and non-TLS connections consistently in the Close() function,
-		// we always specify Transport, even if empty. This allows us to call
-		// CloseIdleConnections on our Transport instance, avoiding the need to differentiate
-		// between TLS and non-TLS connections.
-		Transport: &kafka.Transport{
-			TLS: tlsCfg,
-		},
+	pstr.timeout = defaultKafkaTimeout
+	if opts.DeliveryTimeout != nil {
+		pstr.timeout = *opts.DeliveryTimeout
 	}
 
-	if opts.BatchSize != nil {
-		pstr.writer.BatchSize = *opts.BatchSize
+	var err error
+	pstr.client, err = kgo.NewClient(kgoOpts...)
+	if err != nil {
+		return nil, err
 	}
 
 	return pstr, nil
 }
 
+const defaultKafkaTimeout = 30 * time.Second
+
 // KafkaEE is a kafka poster
 type KafkaEE struct {
-	writer *kafka.Writer
-	cfg    *config.EventExporterCfg
-	em     *utils.ExporterMetrics
-	reqs   *concReq
+	client  *kgo.Client
+	cfg     *config.EventExporterCfg
+	em      *utils.ExporterMetrics
+	reqs    *concReq
+	timeout time.Duration
 	bytePreparing
 }
 
@@ -108,26 +80,46 @@ func (k *KafkaEE) Cfg() *config.EventExporterCfg { return k.cfg }
 
 func (k *KafkaEE) Connect() error { return nil }
 
-func (k *KafkaEE) ExportEvent(content any, key string) (err error) {
+func (k *KafkaEE) ExportEvent(content any, key string) error {
 	k.reqs.get()
 	defer k.reqs.done()
-	return k.writer.WriteMessages(context.Background(), kafka.Message{
-		Key:   []byte(key),
-		Value: content.([]byte),
-	})
+	ctx, cancel := context.WithTimeout(context.Background(), k.timeout)
+	defer cancel()
+	rec := &kgo.Record{Key: []byte(key), Value: content.([]byte)}
+	ch := make(chan error, 1)
+	k.client.Produce(ctx, rec, func(_ *kgo.Record, err error) { ch <- err })
+	return <-ch
 }
 
 func (k *KafkaEE) Close() error {
-
-	// Manually close idle connections to prevent them from running indefinitely
-	// after the Kafka writer is purged. Without this, goroutines will accumulate
-	// over time with each new Kafka writer.
-	tsp, ok := k.writer.Transport.(*kafka.Transport)
-	if ok {
-		tsp.CloseIdleConnections()
-	}
-
-	return k.writer.Close()
+	ctx, cancel := context.WithTimeout(context.Background(), k.timeout)
+	defer cancel()
+	err := k.client.Flush(ctx)
+	k.client.Close()
+	return err
 }
 
 func (k *KafkaEE) GetMetrics() *utils.ExporterMetrics { return k.em }
+
+func buildTLSConfig(caPath *string, skipVerify *bool) (*tls.Config, error) {
+	rootCAs, err := x509.SystemCertPool()
+	if err != nil {
+		return nil, err
+	}
+	if rootCAs == nil {
+		rootCAs = x509.NewCertPool()
+	}
+	if caPath != nil && *caPath != "" {
+		ca, err := os.ReadFile(*caPath)
+		if err != nil {
+			return nil, err
+		}
+		if !rootCAs.AppendCertsFromPEM(ca) {
+			return nil, errors.New("failed to append certificates from PEM file")
+		}
+	}
+	return &tls.Config{
+		RootCAs:            rootCAs,
+		InsecureSkipVerify: skipVerify != nil && *skipVerify,
+	}, nil
+}

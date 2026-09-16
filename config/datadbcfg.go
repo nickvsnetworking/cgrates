@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package config
 
@@ -35,6 +20,7 @@ type DataDBOpts struct {
 	InternalDBDumpInterval    time.Duration // Regurarly dump database to file
 	InternalDBRewriteInterval time.Duration // Regurarly rewrite dump files
 	InternalDBFileSizeLimit   int64         // maximum size that can be written in a singular dump file
+	RedisBatchSize            int
 	RedisMaxConns             int
 	RedisConnectAttempts      int
 	RedisSentinel             string
@@ -42,8 +28,6 @@ type DataDBOpts struct {
 	RedisClusterSync          time.Duration
 	RedisClusterOndownDelay   time.Duration
 	RedisConnectTimeout       time.Duration
-	RedisReadTimeout          time.Duration
-	RedisWriteTimeout         time.Duration
 	RedisPoolPipelineWindow   time.Duration
 	RedisPoolPipelineLimit    int
 	RedisTLS                  bool
@@ -103,6 +87,9 @@ func (dbOpts *DataDBOpts) loadFromJSONCfg(jsnCfg *DBOptsJson) (err error) {
 			return err
 		}
 	}
+	if jsnCfg.RedisBatchSize != nil {
+		dbOpts.RedisBatchSize = *jsnCfg.RedisBatchSize
+	}
 	if jsnCfg.RedisMaxConns != nil {
 		dbOpts.RedisMaxConns = *jsnCfg.RedisMaxConns
 	}
@@ -127,16 +114,6 @@ func (dbOpts *DataDBOpts) loadFromJSONCfg(jsnCfg *DBOptsJson) (err error) {
 	}
 	if jsnCfg.RedisConnectTimeout != nil {
 		if dbOpts.RedisConnectTimeout, err = utils.ParseDurationWithNanosecs(*jsnCfg.RedisConnectTimeout); err != nil {
-			return
-		}
-	}
-	if jsnCfg.RedisReadTimeout != nil {
-		if dbOpts.RedisReadTimeout, err = utils.ParseDurationWithNanosecs(*jsnCfg.RedisReadTimeout); err != nil {
-			return
-		}
-	}
-	if jsnCfg.RedisWriteTimeout != nil {
-		if dbOpts.RedisWriteTimeout, err = utils.ParseDurationWithNanosecs(*jsnCfg.RedisWriteTimeout); err != nil {
 			return
 		}
 	}
@@ -266,6 +243,7 @@ func (dbOpts *DataDBOpts) Clone() *DataDBOpts {
 		InternalDBDumpInterval:    dbOpts.InternalDBDumpInterval,
 		InternalDBRewriteInterval: dbOpts.InternalDBRewriteInterval,
 		InternalDBFileSizeLimit:   dbOpts.InternalDBFileSizeLimit,
+		RedisBatchSize:            dbOpts.RedisBatchSize,
 		RedisMaxConns:             dbOpts.RedisMaxConns,
 		RedisConnectAttempts:      dbOpts.RedisConnectAttempts,
 		RedisSentinel:             dbOpts.RedisSentinel,
@@ -273,8 +251,6 @@ func (dbOpts *DataDBOpts) Clone() *DataDBOpts {
 		RedisClusterSync:          dbOpts.RedisClusterSync,
 		RedisClusterOndownDelay:   dbOpts.RedisClusterOndownDelay,
 		RedisConnectTimeout:       dbOpts.RedisConnectTimeout,
-		RedisReadTimeout:          dbOpts.RedisReadTimeout,
-		RedisWriteTimeout:         dbOpts.RedisWriteTimeout,
 		RedisPoolPipelineWindow:   dbOpts.RedisPoolPipelineWindow,
 		RedisPoolPipelineLimit:    dbOpts.RedisPoolPipelineLimit,
 		RedisTLS:                  dbOpts.RedisTLS,
@@ -326,6 +302,7 @@ func (dbcfg *DataDbCfg) AsMapInterface() (mp map[string]any) {
 		utils.InternalDBDumpIntervalCfg:    dbcfg.Opts.InternalDBDumpInterval.String(),
 		utils.InternalDBRewriteIntervalCfg: dbcfg.Opts.InternalDBRewriteInterval.String(),
 		utils.InternalDBFileSizeLimitCfg:   dbcfg.Opts.InternalDBFileSizeLimit,
+		utils.RedisBatchSizeCfg:            dbcfg.Opts.RedisBatchSize,
 		utils.RedisMaxConnsCfg:             dbcfg.Opts.RedisMaxConns,
 		utils.RedisConnectAttemptsCfg:      dbcfg.Opts.RedisConnectAttempts,
 		utils.RedisSentinelNameCfg:         dbcfg.Opts.RedisSentinel,
@@ -333,8 +310,6 @@ func (dbcfg *DataDbCfg) AsMapInterface() (mp map[string]any) {
 		utils.RedisClusterSyncCfg:          dbcfg.Opts.RedisClusterSync.String(),
 		utils.RedisClusterOnDownDelayCfg:   dbcfg.Opts.RedisClusterOndownDelay.String(),
 		utils.RedisConnectTimeoutCfg:       dbcfg.Opts.RedisConnectTimeout.String(),
-		utils.RedisReadTimeoutCfg:          dbcfg.Opts.RedisReadTimeout.String(),
-		utils.RedisWriteTimeoutCfg:         dbcfg.Opts.RedisWriteTimeout.String(),
 		utils.RedisPoolPipelineWindowCfg:   dbcfg.Opts.RedisPoolPipelineWindow.String(),
 		utils.RedisPoolPipelineLimitCfg:    dbcfg.Opts.RedisPoolPipelineLimit,
 		utils.RedisTLS:                     dbcfg.Opts.RedisTLS,

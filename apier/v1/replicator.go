@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package v1
 
@@ -844,20 +829,43 @@ func (rplSv1 *ReplicatorSv1) SetLoadIDs(ctx *context.Context, args *utils.LoadID
 }
 
 // SetIndexes is the replication method coresponding to the dataDb driver method
-func (rplSv1 *ReplicatorSv1) SetIndexes(ctx *context.Context, args *utils.SetIndexesArg, reply *string) (err error) {
-	if err = rplSv1.dm.DataDB().SetIndexesDrv(args.IdxItmType, args.TntCtx, args.Indexes, true, utils.NonTransactional); err != nil {
-		return
+func (rplSv1 *ReplicatorSv1) SetIndexes(ctx *context.Context, args *utils.SetIndexesArg, reply *string) error {
+	indexes := args.Indexes
+	if args.Clear {
+		if err := rplSv1.dm.DataDB().RemoveIndexesDrv(args.IdxItmType, args.TntCtx); err != nil {
+			return err
+		}
+		indexes = make(map[string]utils.StringSet, len(args.Indexes))
+		for idxKey, index := range args.Indexes {
+			if len(index) != 0 {
+				indexes[idxKey] = index
+			}
+		}
 	}
-	cIDs := make([]string, 0, len(args.Indexes))
-	for idxKey := range args.Indexes {
-		cIDs = append(cIDs, utils.ConcatenatedKey(args.TntCtx, idxKey))
+	if err := rplSv1.dm.DataDB().SetIndexesDrv(args.IdxItmType, args.TntCtx,
+		indexes, true, utils.NonTransactional); err != nil {
+		return err
 	}
-	if err = rplSv1.v1.callCacheMultiple(utils.IfaceAsString(args.APIOpts[utils.CacheOpt]),
-		args.Tenant, args.IdxItmType, cIDs, args.APIOpts); err != nil {
-		return
+	cacheOpt := utils.IfaceAsString(args.APIOpts[utils.CacheOpt])
+	if args.Clear {
+		if utils.FirstNonEmpty(cacheOpt, rplSv1.v1.Config.GeneralCfg().DefaultCaching) != utils.MetaNone {
+			if err := rplSv1.v1.CallCache(utils.MetaRemove, args.Tenant, args.IdxItmType,
+				"", args.TntCtx, nil, nil, args.APIOpts); err != nil {
+				return err
+			}
+		}
+	} else {
+		cIDs := make([]string, 0, len(args.Indexes))
+		for idxKey := range args.Indexes {
+			cIDs = append(cIDs, utils.ConcatenatedKey(args.TntCtx, idxKey))
+		}
+		if err := rplSv1.v1.callCacheMultiple(cacheOpt, args.Tenant,
+			args.IdxItmType, cIDs, args.APIOpts); err != nil {
+			return err
+		}
 	}
 	*reply = utils.OK
-	return
+	return nil
 }
 
 // SetBackupSessions is the replication method coresponding to the dataDB driver method
@@ -996,7 +1004,7 @@ func (rplSv1 *ReplicatorSv1) RemoveRanking(ctx *context.Context, args *utils.Ten
 		return
 	}
 	if err = rplSv1.v1.CallCache(utils.IfaceAsString(args.APIOpts[utils.CacheOpt]),
-		args.Tenant, utils.CacheTrends, args.TenantID.TenantID(), utils.EmptyString, nil, nil, args.APIOpts); err != nil {
+		args.Tenant, utils.CacheRankings, args.TenantID.TenantID(), utils.EmptyString, nil, nil, args.APIOpts); err != nil {
 		return
 	}
 	*reply = utils.OK

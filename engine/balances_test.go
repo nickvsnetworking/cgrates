@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package engine
 
 import (
@@ -1072,6 +1058,54 @@ func TestFieldAsStringCase(t *testing.T) {
 			}
 			if got != tt.expected {
 				t.Errorf("FieldAsString() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestBalanceIsActiveAt(t *testing.T) {
+	amWindow := &RITiming{ID: "AM", StartTime: "00:00:00", EndTime: "11:59:59"}
+	pmWindow := &RITiming{ID: "PM", StartTime: "12:00:00", EndTime: "23:59:59"}
+	allDay := &RITiming{ID: "ALLDAY", StartTime: "00:00:00", EndTime: "23:59:59"}
+	lunch := &RITiming{ID: "LUNCH", StartTime: "12:00:00", EndTime: "12:59:59"}
+
+	morning := time.Date(2021, time.July, 1, 9, 0, 0, 0, time.UTC)
+	noon := time.Date(2021, time.July, 1, 12, 30, 0, 0, time.UTC)
+	afternoon := time.Date(2021, time.July, 1, 15, 0, 0, 0, time.UTC)
+
+	tests := []struct {
+		name string
+		bal  *Balance
+		at   time.Time
+		want bool
+	}{
+		{"no timings is always active",
+			&Balance{}, morning, true},
+		{"timings without ids active inside",
+			&Balance{Timings: []*RITiming{amWindow}}, morning, true},
+		{"timings without ids inactive outside",
+			&Balance{Timings: []*RITiming{amWindow}}, afternoon, false},
+		{"positive window active inside",
+			&Balance{TimingIDs: utils.StringMap{"AM": true}, Timings: []*RITiming{amWindow}}, morning, true},
+		{"positive window inactive outside",
+			&Balance{TimingIDs: utils.StringMap{"AM": true}, Timings: []*RITiming{amWindow}}, afternoon, false},
+		{"negated window active outside",
+			&Balance{TimingIDs: utils.StringMap{"PM": false}, Timings: []*RITiming{pmWindow}}, morning, true},
+		{"negated window inactive inside",
+			&Balance{TimingIDs: utils.StringMap{"PM": false}, Timings: []*RITiming{pmWindow}}, afternoon, false},
+		{"negated overrides matching positive",
+			&Balance{TimingIDs: utils.StringMap{"ALLDAY": true, "LUNCH": false}, Timings: []*RITiming{allDay, lunch}}, noon, false},
+		{"positive matches while negated inactive",
+			&Balance{TimingIDs: utils.StringMap{"ALLDAY": true, "LUNCH": false}, Timings: []*RITiming{allDay, lunch}}, morning, true},
+		{"multiple positives union",
+			&Balance{TimingIDs: utils.StringMap{"AM": true, "PM": true}, Timings: []*RITiming{amWindow, pmWindow}}, afternoon, true},
+		{"disabled is never active",
+			&Balance{Disabled: true, TimingIDs: utils.StringMap{"AM": true}, Timings: []*RITiming{amWindow}}, morning, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.bal.IsActiveAt(tt.at); got != tt.want {
+				t.Errorf("IsActiveAt(%v) = %v, want %v", tt.at, got, tt.want)
 			}
 		})
 	}

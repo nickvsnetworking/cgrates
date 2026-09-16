@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package config
 
@@ -103,7 +88,10 @@ func (rC *RPCConn) AsMapInterface() (initialMP map[string]any) {
 }
 
 // Clone returns a deep copy of RPCConn
-func (rC RPCConn) Clone() (cln *RPCConn) {
+func (rC *RPCConn) Clone() (cln *RPCConn) {
+	if rC == nil {
+		return nil
+	}
 	cln = &RPCConn{
 		Strategy: rC.Strategy,
 		PoolSize: rC.PoolSize,
@@ -225,7 +213,10 @@ func (rh *RemoteHost) AsMapInterface() (mp map[string]any) {
 }
 
 // Clone returns a deep copy of RemoteHost
-func (rh RemoteHost) Clone() (cln *RemoteHost) {
+func (rh *RemoteHost) Clone() (cln *RemoteHost) {
+	if rh == nil {
+		return nil
+	}
 	return &RemoteHost{
 		ID:                   rh.ID,
 		Address:              rh.Address,

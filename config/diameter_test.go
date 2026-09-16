@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package config
 
 import (
@@ -33,19 +19,23 @@ func TestDiameterAgentCfgloadFromJsonCfg(t *testing.T) {
 				Address: utils.StringPointer("127.0.0.1:3868")},
 		},
 
-		CeApplications:     utils.SliceStringPointer([]string{"Base"}),
-		DictionariesPath:   utils.StringPointer("/usr/share/cgrates/diameter/dict/"),
-		SessionSConns:      &[]string{utils.MetaInternal, "*conn1"},
-		StatSConns:         &[]string{utils.MetaInternal, "*conn1"},
-		ThresholdSConns:    &[]string{utils.MetaInternal, "*conn1"},
-		OriginHost:         utils.StringPointer("CGR-DA"),
-		OriginRealm:        utils.StringPointer("cgrates.org"),
-		VendorID:           utils.IntPointer(0),
-		ProductName:        utils.StringPointer("randomName"),
-		SyncedConnRequests: utils.BoolPointer(true),
-		ASRTemplate:        utils.StringPointer("randomTemplate"),
-		RARTemplate:        utils.StringPointer("randomTemplate"),
-		ForcedDisconnect:   utils.StringPointer("forced"),
+		CeApplications:             utils.SliceStringPointer([]string{"Base"}),
+		DictionariesPath:           utils.StringPointer("/usr/share/cgrates/diameter/dict/"),
+		DictionariesAppendDefaults: utils.BoolPointer(true),
+		SessionSConns:              &[]string{utils.MetaInternal, "*conn1"},
+		StatSConns:                 &[]string{utils.MetaInternal, "*conn1"},
+		ThresholdSConns:            &[]string{utils.MetaInternal, "*conn1"},
+		OriginHost:                 utils.StringPointer("CGR-DA"),
+		OriginRealm:                utils.StringPointer("cgrates.org"),
+		VendorID:                   utils.IntPointer(0),
+		ProductName:                utils.StringPointer("randomName"),
+		SyncedConnRequests:         utils.BoolPointer(true),
+		ASRTemplate:                utils.StringPointer("randomTemplate"),
+		RARTemplate:                utils.StringPointer("randomTemplate"),
+		SNRTemplate:                utils.StringPointer("randomTemplate"),
+		SLRTemplate:                utils.StringPointer("randomTemplate"),
+		STRTemplate:                utils.StringPointer("randomTemplate"),
+		ForcedDisconnect:           utils.StringPointer("forced"),
 		RequestProcessors: &[]*ReqProcessorJsnCfg{
 			{
 				ID:       utils.StringPointer(utils.CGRateSLwr),
@@ -62,21 +52,25 @@ func TestDiameterAgentCfgloadFromJsonCfg(t *testing.T) {
 			},
 		},
 
-		CeApplications:         []string{"Base"},
-		DictionariesPath:       "/usr/share/cgrates/diameter/dict/",
-		SessionSConns:          []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaSessionS), "*conn1"},
-		StatSConns:             []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaStats), "*conn1"},
-		ThresholdSConns:        []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaThresholds), "*conn1"},
-		ConnStatusStatQueueIDs: []string{},
-		ConnStatusThresholdIDs: []string{},
-		OriginHost:             "CGR-DA",
-		OriginRealm:            "cgrates.org",
-		VendorID:               0,
-		ProductName:            "randomName",
-		SyncedConnReqs:         true,
-		ASRTemplate:            "randomTemplate",
-		RARTemplate:            "randomTemplate",
-		ForcedDisconnect:       "forced",
+		CeApplications:             []string{"Base"},
+		DictionariesPath:           "/usr/share/cgrates/diameter/dict/",
+		DictionariesAppendDefaults: true,
+		SessionSConns:              []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaSessionS), "*conn1"},
+		StatSConns:                 []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaStats), "*conn1"},
+		ThresholdSConns:            []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaThresholds), "*conn1"},
+		ConnStatusStatQueueIDs:     []string{},
+		ConnStatusThresholdIDs:     []string{},
+		OriginHost:                 "CGR-DA",
+		OriginRealm:                "cgrates.org",
+		VendorID:                   0,
+		ProductName:                "randomName",
+		SyncedConnReqs:             true,
+		ASRTemplate:                "randomTemplate",
+		RARTemplate:                "randomTemplate",
+		SNRTemplate:                "randomTemplate",
+		SLRTemplate:                "randomTemplate",
+		STRTemplate:                "randomTemplate",
+		ForcedDisconnect:           "forced",
 		RequestProcessors: []*RequestProcessor{
 			{
 				ID:       "cgrates",
@@ -103,6 +97,13 @@ func TestRequestProcessorloadFromJsonCfg1(t *testing.T) {
 	expected := "invalid converter terminator in rule: <a{*>"
 	jsonCfg := NewDefaultCGRConfig()
 	if err := jsonCfg.diameterAgentCfg.loadFromJSONCfg(cfgJSON, jsonCfg.generalCfg.RSRSep); err == nil || err.Error() != expected {
+		t.Errorf("Expected %+v, received %+v", expected, err)
+	}
+
+	cfgJSON2 := &DiameterAgentJsonCfg{
+		ConnHealthCheckInterval: utils.StringPointer("errduration"),
+	}
+	if err := jsonCfg.diameterAgentCfg.loadFromJSONCfg(cfgJSON2, jsonCfg.generalCfg.RSRSep); err == nil {
 		t.Errorf("Expected %+v, received %+v", expected, err)
 	}
 }
@@ -165,11 +166,15 @@ func TestDiameterAgentCfgAsMapInterface(t *testing.T) {
 	},
 }`
 	eMap := map[string]any{
-		utils.ASRTemplateCfg:      "",
-		utils.CeApplicationsCfg:   []string{"Base"},
-		utils.DictionariesPathCfg: "/usr/share/cgrates/diameter/dict/",
-		utils.EnabledCfg:          false,
-		utils.ForcedDisconnectCfg: "*none",
+		utils.ASRTemplateCfg:                "",
+		utils.SLRTemplateCfg:                "",
+		utils.SNRTemplateCfg:                "",
+		utils.STRTemplateCfg:                "",
+		utils.CeApplicationsCfg:             []string{"Base"},
+		utils.DictionariesPathCfg:           "/usr/share/cgrates/diameter/dict/",
+		utils.DictionariesAppendDefaultsCfg: true,
+		utils.EnabledCfg:                    false,
+		utils.ForcedDisconnectCfg:           "*none",
 		utils.ListenersCfg: []map[string]any{
 			{
 				utils.AddressCfg: "127.0.0.1:3868",
@@ -240,11 +245,15 @@ func TestDiameterAgentCfgAsMapInterface1(t *testing.T) {
 	},
 }`
 	eMap := map[string]any{
-		utils.ASRTemplateCfg:      "",
-		utils.CeApplicationsCfg:   []string{"Nokia.4"},
-		utils.DictionariesPathCfg: "/usr/share/cgrates/diameter",
-		utils.EnabledCfg:          true,
-		utils.ForcedDisconnectCfg: "*none",
+		utils.ASRTemplateCfg:                "",
+		utils.SLRTemplateCfg:                "",
+		utils.SNRTemplateCfg:                "",
+		utils.STRTemplateCfg:                "",
+		utils.CeApplicationsCfg:             []string{"Nokia.4"},
+		utils.DictionariesPathCfg:           "/usr/share/cgrates/diameter",
+		utils.DictionariesAppendDefaultsCfg: true,
+		utils.EnabledCfg:                    true,
+		utils.ForcedDisconnectCfg:           "*none",
 		utils.ListenersCfg: []map[string]any{
 			{
 				utils.AddressCfg: "127.0.0.1:3868",
@@ -279,17 +288,18 @@ func TestDiameterAgentCfgClone(t *testing.T) {
 			{Network: "tcp",
 				Address: "127.0.0.1:3868"},
 		},
-		CeApplications:   []string{"Base"},
-		DictionariesPath: "/usr/share/cgrates/diameter/dict/",
-		SessionSConns:    []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaSessionS), "*conn1"},
-		OriginHost:       "CGR-DA",
-		OriginRealm:      "cgrates.org",
-		VendorID:         0,
-		ProductName:      "randomName",
-		SyncedConnReqs:   true,
-		ASRTemplate:      "randomTemplate",
-		RARTemplate:      "randomTemplate",
-		ForcedDisconnect: "forced",
+		CeApplications:             []string{"Base"},
+		DictionariesPath:           "/usr/share/cgrates/diameter/dict/",
+		DictionariesAppendDefaults: true,
+		SessionSConns:              []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaSessionS), "*conn1"},
+		OriginHost:                 "CGR-DA",
+		OriginRealm:                "cgrates.org",
+		VendorID:                   0,
+		ProductName:                "randomName",
+		SyncedConnReqs:             true,
+		ASRTemplate:                "randomTemplate",
+		RARTemplate:                "randomTemplate",
+		ForcedDisconnect:           "forced",
 		RequestProcessors: []*RequestProcessor{
 			{
 				ID:       "cgrates",
@@ -306,5 +316,11 @@ func TestDiameterAgentCfgClone(t *testing.T) {
 	}
 	if rcv.RequestProcessors[0].ID = ""; ban.RequestProcessors[0].ID != "cgrates" {
 		t.Errorf("Expected clone to not modify the cloned")
+	}
+
+	ban = nil
+	rcv = ban.Clone()
+	if !reflect.DeepEqual(ban, rcv) {
+		t.Errorf("Expected: %+v\nReceived: %+v", utils.ToJSON(ban), utils.ToJSON(rcv))
 	}
 }

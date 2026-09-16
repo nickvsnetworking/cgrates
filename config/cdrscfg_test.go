@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package config
 
 import (
@@ -184,5 +170,44 @@ func TestCdrsCfgClone(t *testing.T) {
 
 	if rcv.OnlineCDRExports[0] = ""; ban.OnlineCDRExports[0] != "randomVal" {
 		t.Errorf("Expected clone to not modify the cloned")
+	}
+
+	ban = nil
+	rcv = ban.Clone()
+	if !reflect.DeepEqual(ban, rcv) {
+		t.Errorf("Expected: %+v\nReceived: %+v", utils.ToJSON(ban), utils.ToJSON(rcv))
+	}
+}
+
+func TestCdrsCfgOnlineCDRExports(t *testing.T) {
+	jsonCfg := &CdrsJsonCfg{
+		Online_cdr_exports: &[]string{"http_billing_event"},
+	}
+	jsnCfg := NewDefaultCGRConfig()
+	if err := jsnCfg.cdrsCfg.loadFromJSONCfg(jsonCfg); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(jsnCfg.cdrsCfg.OnlineCDRExports, []string{"http_billing_event"}) {
+		t.Fatalf("Expected [http_billing_event], got %+v", jsnCfg.cdrsCfg.OnlineCDRExports)
+	}
+
+	jsonCfg2 := &CdrsJsonCfg{
+		Online_cdr_exports: &[]string{"exporter_1", "exporter_2"},
+	}
+	if err := jsnCfg.cdrsCfg.loadFromJSONCfg(jsonCfg2); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(jsnCfg.cdrsCfg.OnlineCDRExports, []string{"exporter_1", "exporter_2"}) {
+		t.Fatalf("Expected [exporter_1, exporter_2], got %+v", jsnCfg.cdrsCfg.OnlineCDRExports)
+	}
+
+	jsonCfg3 := &CdrsJsonCfg{
+		Online_cdr_exports: &[]string{},
+	}
+	if err := jsnCfg.cdrsCfg.loadFromJSONCfg(jsonCfg3); err != nil {
+		t.Fatal(err)
+	}
+	if len(jsnCfg.cdrsCfg.OnlineCDRExports) != 0 {
+		t.Fatalf("Expected empty OnlineCDRExports, got %+v", jsnCfg.cdrsCfg.OnlineCDRExports)
 	}
 }

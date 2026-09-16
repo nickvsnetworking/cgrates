@@ -1,27 +1,15 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package config
 
 import (
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/cgrates/cgrates/utils"
+	"github.com/cgrates/ltcache"
 )
 
 func TestDataDbCfgloadFromJsonCfg(t *testing.T) {
@@ -104,6 +92,26 @@ func TestDataDbCfgloadFromJsonCfg(t *testing.T) {
 		t.Error(err)
 	} else if err := jsnCfg.dataDbCfg.loadFromJSONCfg(&DbJsonCfg{
 		Opts: &DBOptsJson{
+			InternalDBStartTimeout: utils.StringPointer("test"),
+		}}); err == nil {
+		t.Error(err)
+	} else if err := jsnCfg.dataDbCfg.loadFromJSONCfg(&DbJsonCfg{
+		Opts: &DBOptsJson{
+			InternalDBDumpInterval: utils.StringPointer("test"),
+		}}); err == nil {
+		t.Error(err)
+	} else if err := jsnCfg.dataDbCfg.loadFromJSONCfg(&DbJsonCfg{
+		Opts: &DBOptsJson{
+			InternalDBRewriteInterval: utils.StringPointer("test"),
+		}}); err == nil {
+		t.Error(err)
+	} else if err := jsnCfg.dataDbCfg.loadFromJSONCfg(&DbJsonCfg{
+		Opts: &DBOptsJson{
+			InternalDBFileSizeLimit: utils.StringPointer("test"),
+		}}); err == nil {
+		t.Error(err)
+	} else if err := jsnCfg.dataDbCfg.loadFromJSONCfg(&DbJsonCfg{
+		Opts: &DBOptsJson{
 			RedisClusterOndownDelay: utils.StringPointer("test2"),
 		},
 	}); err == nil {
@@ -116,19 +124,13 @@ func TestDataDbCfgloadFromJsonCfg(t *testing.T) {
 		t.Error(err)
 	} else if err := jsnCfg.dataDbCfg.loadFromJSONCfg(&DbJsonCfg{
 		Opts: &DBOptsJson{
-			RedisReadTimeout: utils.StringPointer("test4"),
-		},
-	}); err == nil {
-		t.Error(err)
-	} else if err := jsnCfg.dataDbCfg.loadFromJSONCfg(&DbJsonCfg{
-		Opts: &DBOptsJson{
-			RedisWriteTimeout: utils.StringPointer("test5"),
-		},
-	}); err == nil {
-		t.Error(err)
-	} else if err := jsnCfg.dataDbCfg.loadFromJSONCfg(&DbJsonCfg{
-		Opts: &DBOptsJson{
 			MongoQueryTimeout: utils.StringPointer("test4"),
+		},
+	}); err == nil {
+		t.Error(err)
+	} else if err := jsnCfg.dataDbCfg.loadFromJSONCfg(&DbJsonCfg{
+		Opts: &DBOptsJson{
+			RedisPoolPipelineWindow: utils.StringPointer("test4"),
 		},
 	}); err == nil {
 		t.Error(err)
@@ -344,6 +346,23 @@ func TestDataDBRemoteReplication(t *testing.T) {
 		t.Error(err)
 	} else if err = dbcfg.loadFromJSONCfg(jsnDataDbCfg); err != nil {
 		t.Error(err)
+	} else if !reflect.DeepEqual(expected, dbcfg) {
+		t.Errorf("Expected: %+v ,\n received: %+v", utils.ToJSON(expected), utils.ToJSON(dbcfg))
+	}
+
+	cfgJSONStr = `{
+"data_db": {								
+	"db_type": "*internal",					
+	"replication_interval": "inv",
+	}
+}`
+	expectederr := `time: invalid duration "inv"`
+	if jsnCfg, err := NewCgrJsonCfgFromBytes([]byte(cfgJSONStr)); err != nil {
+		t.Error(err)
+	} else if jsnDataDbCfg, err := jsnCfg.DbJsonCfg(DATADB_JSN); err != nil {
+		t.Error(err)
+	} else if err = dbcfg.loadFromJSONCfg(jsnDataDbCfg); err == nil || err.Error() != expectederr {
+		t.Errorf("Execting %v recieved %v", expected, err)
 	} else if !reflect.DeepEqual(expected, dbcfg) {
 		t.Errorf("Expected: %+v ,\n received: %+v", utils.ToJSON(expected), utils.ToJSON(dbcfg))
 	}
@@ -613,5 +632,47 @@ func TestCloneDataDB(t *testing.T) {
 		} else if !reflect.DeepEqual(rcv.RplConns, jsnCfg.dataDbCfg.RplConns) {
 			t.Errorf("Expected %+v \n, received %+v", rcv.RplConns, jsnCfg.dataDbCfg.RplConns)
 		}
+	}
+}
+
+func TestDataDBOptsToTransCacheOpts(t *testing.T) {
+	tests := []struct {
+		name       string
+		dataDBOpts *DataDBOpts
+		want       *ltcache.TransCacheOpts
+	}{
+		{
+			name: "Complete dataDBOpts",
+			dataDBOpts: &DataDBOpts{
+				InternalDBDumpPath:        "/testPath",
+				InternalDBBackupPath:      "/test",
+				InternalDBStartTimeout:    10 * time.Second,
+				InternalDBDumpInterval:    20 * time.Second,
+				InternalDBRewriteInterval: 30 * time.Second,
+				InternalDBFileSizeLimit:   1024,
+			},
+			want: &ltcache.TransCacheOpts{
+				DumpPath:        "/testPath",
+				BackupPath:      "/test",
+				StartTimeout:    10 * time.Second,
+				DumpInterval:    20 * time.Second,
+				RewriteInterval: 30 * time.Second,
+				FileSizeLimit:   1024,
+			},
+		},
+		{
+			name:       "Nil dataDBOpts",
+			dataDBOpts: nil,
+			want:       nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.dataDBOpts.ToTransCacheOpts()
+
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ToTransCacheOpts() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

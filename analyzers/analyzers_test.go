@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package analyzers
 
@@ -457,6 +442,53 @@ func TestAnalyzersV1Search(t *testing.T) {
 			ContentFilters: []string{"*type:~*opts.EventSource:*cdrs"},
 		}, &reply); err == nil || err.Error() != expErr.Error() {
 		t.Errorf("Expected error: %s,received:%v", expErr, err)
+	}
+
+	reply = []map[string]any{}
+	if err = anz.V1StringQuery(context.Background(),
+		&QueryArgs{
+			HeaderFilters: `"` + utils.CoreSv1Ping + `"`,
+			Limit:         2,
+		}, &reply); err != nil {
+		t.Fatal(err)
+	} else if len(reply) != 2 {
+		t.Errorf("Expected 2 hits with Limit=2, received: %v", len(reply))
+	}
+
+	reply = []map[string]any{}
+	if err = anz.V1StringQuery(context.Background(),
+		&QueryArgs{
+			HeaderFilters: `"` + utils.CoreSv1Ping + `"`,
+			Limit:         4,
+			Offset:        2,
+		}, &reply); err != nil {
+		t.Fatal(err)
+	} else if len(reply) != 2 {
+		t.Errorf("Expected 2 hits with Offset=2, received: %v", len(reply))
+	}
+
+	reply = []map[string]any{}
+	if err = anz.V1StringQuery(context.Background(),
+		&QueryArgs{
+			HeaderFilters: `"` + utils.CoreSv1Ping + `"`,
+			Limit:         1,
+			Offset:        1,
+		}, &reply); err != nil {
+		t.Fatal(err)
+	} else if len(reply) != 1 {
+		t.Errorf("Expected 1 hit with Limit=1 Offset=1, received: %v", len(reply))
+	}
+
+	reply = []map[string]any{}
+	if err = anz.V1StringQuery(context.Background(),
+		&QueryArgs{
+			HeaderFilters: `"` + utils.CoreSv1Ping + `"`,
+			Limit:         0,
+			Offset:        0,
+		}, &reply); err != nil {
+		t.Fatal(err)
+	} else if len(reply) != 4 {
+		t.Errorf("Expected 4 hits with Limit=0 Offset=0, received: %v", len(reply))
 	}
 
 	if err = anz.db.Close(); err != nil {

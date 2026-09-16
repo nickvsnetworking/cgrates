@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package agents
 
@@ -313,7 +298,7 @@ func (ra *RadiusAgent) processRequest(req *radigo.Packet, reqProcessor *config.R
 	if err = agReq.SetFields(reqProcessor.RequestFields); err != nil {
 		return
 	}
-	cgrEv := utils.NMAsCGREvent(agReq.CGRRequest, agReq.Tenant, utils.NestingSep, agReq.Opts)
+	cgrEv := utils.NMAsCGREvent(agReq.CGRRequest, agReq.Tenant, agReq.Opts)
 	var reqType string
 	for _, typ := range []string{
 		utils.MetaDryRun, utils.MetaAuthorize,
@@ -759,5 +744,10 @@ func daRequestAddress(remoteAddr string, dynAuthAddresses map[string]config.DACl
 
 // V1WarnDisconnect is needed to satisfy the sessions.BiRPClient interface
 func (*RadiusAgent) V1WarnDisconnect(_ *context.Context, _ map[string]any, _ *string) error {
+	return utils.ErrNotImplemented
+}
+
+// V1SpendingStatusNotification is used to implement the sessions.BiRPClient interface
+func (*RadiusAgent) V1SpendingStatusNotification(*context.Context, *utils.CGREvent, *string) error {
 	return utils.ErrNotImplemented
 }

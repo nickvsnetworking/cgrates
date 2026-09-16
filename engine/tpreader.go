@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package engine
 
@@ -475,7 +460,7 @@ func (tpr *TpReader) LoadActions() (err error) {
 			}
 
 			if tpact.BalanceWeight != "" && tpact.BalanceWeight != utils.MetaAny {
-				u, err := strconv.ParseFloat(tpact.BalanceWeight, 64)
+				u, err := utils.BalanceWeightAsFloat64(tpact.BalanceWeight)
 				if err != nil {
 					return err
 				}
@@ -517,6 +502,7 @@ func (tpr *TpReader) LoadActions() (err error) {
 			if tpact.TimingTags != "" {
 				timingIds := strings.Split(tpact.TimingTags, utils.InfieldSep)
 				for _, timingID := range timingIds {
+					timingID = strings.TrimPrefix(timingID, utils.NegativePrefix)
 					timing, found := tpr.timings[timingID]
 					if !found {
 						if timing, err = tpr.dm.GetTiming(timingID, false,
@@ -949,7 +935,7 @@ func (tpr *TpReader) LoadAccountActionsFiltered(qriedAA *utils.TPAccountActions)
 					}
 
 					if tpact.BalanceWeight != "" && tpact.BalanceWeight != utils.MetaAny {
-						u, err := strconv.ParseFloat(tpact.BalanceWeight, 64)
+						u, err := utils.BalanceWeightAsFloat64(tpact.BalanceWeight)
 						if err != nil {
 							return err
 						}
@@ -989,6 +975,7 @@ func (tpr *TpReader) LoadAccountActionsFiltered(qriedAA *utils.TPAccountActions)
 					if tpact.TimingTags != "" {
 						timingIds := strings.Split(tpact.TimingTags, utils.InfieldSep)
 						for _, timingID := range timingIds {
+							timingID = strings.TrimPrefix(timingID, utils.NegativePrefix)
 							if timing, found := tpr.timings[timingID]; found {
 								acts[idx].Balance.Timings = append(acts[idx].Balance.Timings, &RITiming{
 									ID:        timingID,

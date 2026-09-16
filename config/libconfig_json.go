@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package config
 
@@ -111,6 +96,7 @@ type DBOptsJson struct {
 	InternalDBDumpInterval    *string           `json:"internalDBDumpInterval"`
 	InternalDBRewriteInterval *string           `json:"internalDBRewriteInterval"`
 	InternalDBFileSizeLimit   *string           `json:"internalDBFileSizeLimit"`
+	RedisBatchSize            *int              `json:"redisBatchSize"`
 	RedisMaxConns             *int              `json:"redisMaxConns"`
 	RedisConnectAttempts      *int              `json:"redisConnectAttempts"`
 	RedisSentinel             *string           `json:"redisSentinel"`
@@ -118,8 +104,6 @@ type DBOptsJson struct {
 	RedisClusterSync          *string           `json:"redisClusterSync"`
 	RedisClusterOndownDelay   *string           `json:"redisClusterOndownDelay"`
 	RedisConnectTimeout       *string           `json:"redisConnectTimeout"`
-	RedisReadTimeout          *string           `json:"redisReadTimeout"`
-	RedisWriteTimeout         *string           `json:"redisWriteTimeout"`
 	RedisPoolPipelineWindow   *string           `json:"redisPoolPipelineWindow"`
 	RedisPoolPipelineLimit    *int              `json:"redisPoolPipelineLimit"`
 	RedisTLS                  *bool             `json:"redisTLS"`
@@ -242,6 +226,7 @@ type EventReaderOptsJson struct {
 	PartialCacheAction       *string   `json:"partialCacheAction"`
 	PartialOrderField        *string   `json:"partialOrderField"`
 	PartialCSVFieldSeparator *string   `json:"partialcsvFieldSeparator"`
+	IgnoreErroredItems       *bool     `json:"ignoreErroredItems"`
 	CSVRowLength             *int      `json:"csvRowLength"`
 	CSVFieldSeparator        *string   `json:"csvFieldSeparator"`
 	CSVHeaderDefineChar      *string   `json:"csvHeaderDefineChar"`
@@ -299,7 +284,6 @@ type EventReaderJsonCfg struct {
 	Flags                  *[]string
 	Reconnects             *int
 	Max_reconnect_interval *string
-	Ees_ids                *[]string
 	Ees_success_ids        *[]string
 	Ees_failed_ids         *[]string
 	Opts                   *EventReaderOptsJson
@@ -325,7 +309,6 @@ type EEsJsonCfg struct {
 
 type EventExporterOptsJson struct {
 	CSVFieldSeparator           *string           `json:"csvFieldSeparator"`
-	ElsCloud                    *bool             `json:"elsCloud"`
 	ElsAPIKey                   *string           `json:"elsApiKey"`
 	ElsServiceToken             *string           `json:"elsServiceToken"`
 	ElsCertificateFingerprint   *string           `json:"elsCertificateFingerPrint"`
@@ -357,7 +340,8 @@ type EventExporterOptsJson struct {
 	SQLUpdateIndexedFields      *[]string         `json:"sqlUpdateIndexedFields"`
 	PgSSLMode                   *string           `json:"pgSSLMode"`
 	KafkaTopic                  *string           `json:"kafkaTopic"`
-	KafkaBatchSize              *int              `json:"kafkaBatchSize"`
+	KafkaLinger                 *string           `json:"kafkaLinger"`
+	KafkaDeliveryTimeout        *string           `json:"kafkaDeliveryTimeout"`
 	KafkaTLS                    *bool             `json:"kafkaTLS"`
 	KafkaCAPath                 *string           `json:"kafkaCAPath"`
 	KafkaSkipTLSVerify          *bool             `json:"kafkaSkipTLSVerify"`
@@ -420,6 +404,7 @@ type EventExporterJsonCfg struct {
 // SessionSJsonCfg config section
 type SessionSJsonCfg struct {
 	Enabled                *bool              `json:"enabled"`
+	ApierSConns            *[]string          `json:"apiers_conns"`
 	ChargerSConns          *[]string          `json:"chargers_conns"`
 	RALsConns              *[]string          `json:"rals_conns"`
 	IPsConns               *[]string          `json:"ips_conns"`
@@ -440,6 +425,7 @@ type SessionSJsonCfg struct {
 	SessionIndexes         *[]string          `json:"session_indexes"`
 	ClientProtocol         *float64           `json:"client_protocol"`
 	ChannelSyncInterval    *string            `json:"channel_sync_interval"`
+	ChannelSyncTimeout     *string            `json:"channel_sync_timeout"`
 	StaleChanMaxExtraUsage *string            `json:"stale_chan_max_extra_usage"`
 	TerminateAttempts      *int               `json:"terminate_attempts"`
 	AlterableFields        *[]string          `json:"alterable_fields"`
@@ -565,25 +551,29 @@ type DiamListenerJsnCfg struct {
 
 // DiameterAgent configuration
 type DiameterAgentJsonCfg struct {
-	Enabled                 *bool                  `json:"enabled"`
-	Listeners               *[]*DiamListenerJsnCfg `json:"listeners"`
-	DictionariesPath        *string                `json:"dictionaries_path"`
-	CeApplications          *[]string              `json:"ce_applications"`
-	SessionSConns           *[]string              `json:"sessions_conns"`
-	StatSConns              *[]string              `json:"stats_conns"`
-	ThresholdSConns         *[]string              `json:"thresholds_conns"`
-	OriginHost              *string                `json:"origin_host"`
-	OriginRealm             *string                `json:"origin_realm"`
-	VendorID                *int                   `json:"vendor_id"`
-	ProductName             *string                `json:"product_name"`
-	SyncedConnRequests      *bool                  `json:"synced_conn_requests"`
-	ASRTemplate             *string                `json:"asr_template"`
-	RARTemplate             *string                `json:"rar_template"`
-	ForcedDisconnect        *string                `json:"forced_disconnect"`
-	StatQueueIDs            *[]string              `json:"conn_status_stat_queue_ids"`
-	ThresholdIDs            *[]string              `json:"conn_status_threshold_ids"`
-	ConnHealthCheckInterval *string                `json:"conn_health_check_interval"`
-	RequestProcessors       *[]*ReqProcessorJsnCfg `json:"request_processors"`
+	Enabled                    *bool                  `json:"enabled"`
+	Listeners                  *[]*DiamListenerJsnCfg `json:"listeners"`
+	DictionariesPath           *string                `json:"dictionaries_path"`
+	DictionariesAppendDefaults *bool                  `json:"dictionaries_append_defaults"`
+	CeApplications             *[]string              `json:"ce_applications"`
+	SessionSConns              *[]string              `json:"sessions_conns"`
+	StatSConns                 *[]string              `json:"stats_conns"`
+	ThresholdSConns            *[]string              `json:"thresholds_conns"`
+	OriginHost                 *string                `json:"origin_host"`
+	OriginRealm                *string                `json:"origin_realm"`
+	VendorID                   *int                   `json:"vendor_id"`
+	ProductName                *string                `json:"product_name"`
+	SyncedConnRequests         *bool                  `json:"synced_conn_requests"`
+	ASRTemplate                *string                `json:"asr_template"`
+	RARTemplate                *string                `json:"rar_template"`
+	SNRTemplate                *string                `json:"snr_template"`
+	SLRTemplate                *string                `json:"slr_template"`
+	STRTemplate                *string                `json:"str_template"`
+	ForcedDisconnect           *string                `json:"forced_disconnect"`
+	StatQueueIDs               *[]string              `json:"conn_status_stat_queue_ids"`
+	ThresholdIDs               *[]string              `json:"conn_status_threshold_ids"`
+	ConnHealthCheckInterval    *string                `json:"conn_health_check_interval"`
+	RequestProcessors          *[]*ReqProcessorJsnCfg `json:"request_processors"`
 }
 
 type RadiListenerJsnCfg struct {

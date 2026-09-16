@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package utils
 
@@ -97,13 +82,13 @@ func (onm *OrderedNavigableMap) Remove(fullPath *FullPath) (err error) {
 // Set sets the value at the given path
 // this used with full path and the processed path to not calculate them for every set
 // used in tests
-func (onm *OrderedNavigableMap) Set(fullPath *FullPath, val any) (err error) {
+func (onm *OrderedNavigableMap) Set(fullPath *FullPath, val any) error {
 	if fullPath == nil || len(fullPath.PathSlice) == 0 {
 		return ErrWrongPath
 	}
-	var addedNew bool // determine if the node was created or only overwriten
-	if addedNew, err = onm.nm.Set(fullPath.PathSlice, val); err != nil {
-		return
+	addedNew, err := onm.nm.Set(fullPath.PathSlice, val)
+	if err != nil {
+		return err
 	}
 
 	// update the  order reference
@@ -114,19 +99,22 @@ func (onm *OrderedNavigableMap) Set(fullPath *FullPath, val any) (err error) {
 	} else { // move element in the back of order list
 		onm.orderIdx.MoveToBack(onm.orderRef[path][len(onm.orderRef[path])-1])
 	}
-	return
+	return nil
 }
 
 // SetAsSlice sets the slice of nodes at the given path
 // this used with full path and the processed path to not calculate them for every set
 // this is used by agent request to overwrite the slice at path
-func (onm *OrderedNavigableMap) SetAsSlice(fullPath *FullPath, vals []*DataNode) (err error) {
+func (onm *OrderedNavigableMap) SetAsSlice(fullPath *FullPath, vals []*DataNode) error {
 	if fullPath == nil || len(fullPath.PathSlice) == 0 {
 		return ErrWrongPath
 	}
-	var addedNew bool
-	if addedNew, err = onm.nm.Set(fullPath.PathSlice, vals); err != nil {
-		return
+	if len(vals) == 1 && vals[0].Type == NMDataType {
+		return onm.Set(fullPath, vals[0].Value)
+	}
+	addedNew, err := onm.nm.Set(fullPath.PathSlice, vals)
+	if err != nil {
+		return err
 	}
 
 	pathItmsSet := make([][]string, len(vals)) // prepare the path for order update
@@ -140,7 +128,7 @@ func (onm *OrderedNavigableMap) SetAsSlice(fullPath *FullPath, vals []*DataNode)
 	for _, pathItms := range pathItmsSet { // add the path in order list
 		onm.orderRef[path] = append(onm.orderRef[path], onm.orderIdx.PushBack(pathItms))
 	}
-	return
+	return nil
 }
 
 // FieldAsString returns the value from path as string
@@ -155,6 +143,12 @@ func (onm *OrderedNavigableMap) FieldAsString(fldPath []string) (str string, err
 // FieldAsInterface returns the interface at the path
 func (onm *OrderedNavigableMap) FieldAsInterface(fldPath []string) (iface any, err error) {
 	return onm.nm.FieldAsInterface(fldPath)
+}
+
+// AsMap returns the contents as a nested map[string]any.
+func (onm *OrderedNavigableMap) AsMap() map[string]any {
+	v, _ := onm.nm.AsMapOrValue().(map[string]any)
+	return v
 }
 
 // GetOrder returns the elements order as a slice
@@ -194,39 +188,47 @@ func (onm *OrderedNavigableMap) OrderedFieldsAsStrings() (flds []string) {
 
 // Append appends the leaf at the given path the end must be a slice
 // this used with full path and the processed path to not calculate them for every set
-func (onm *OrderedNavigableMap) Append(fullPath *FullPath, val *DataLeaf) (err error) {
+func (onm *OrderedNavigableMap) Append(fullPath *FullPath, val *DataLeaf) error {
 	if fullPath == nil || len(fullPath.PathSlice) == 0 {
 		return ErrWrongPath
 	}
-	var idx int
-	if idx, err = onm.nm.Append(fullPath.PathSlice, val); err != nil {
-		return
+	idx, err := onm.nm.Append(fullPath.PathSlice, val)
+	if err != nil {
+		return err
+	}
+	// fix up order entries after leaf to slice promotion
+	if idx == 1 {
+		if refs, has := onm.orderRef[fullPath.Path]; has && len(refs) > 0 {
+			if len(refs[0].Value) == len(fullPath.PathSlice) {
+				for _, ref := range refs {
+					ref.Value = append(ref.Value, "0")
+				}
+			}
+		}
 	}
 	// add the path to order
 	onm.orderRef[fullPath.Path] = append(onm.orderRef[fullPath.Path],
 		onm.orderIdx.PushBack(
 			append(slices.Clone(fullPath.PathSlice), // clone the slice as we will append an index
 				strconv.Itoa(idx))))
-	return
+	return nil
 }
 
 // Compose compose the value of the leaf at the given path
 // this used with full path and the processed path to not calculate them for every set
-func (onm *OrderedNavigableMap) Compose(fullPath *FullPath, val *DataLeaf) (err error) {
+func (onm *OrderedNavigableMap) Compose(fullPath *FullPath, val *DataLeaf) error {
 	if fullPath == nil || len(fullPath.PathSlice) == 0 {
 		return ErrWrongPath
 	}
-	if err = onm.nm.Compose(fullPath.PathSlice, val); err != nil {
-		return
+	if err := onm.nm.Compose(fullPath.PathSlice, val); err != nil {
+		return err
 	}
 
 	if _, hasRef := onm.orderRef[fullPath.Path]; !hasRef { // the element is new so append to order
 		onm.orderRef[fullPath.Path] = append(onm.orderRef[fullPath.Path],
-			onm.orderIdx.PushBack(
-				append(slices.Clone(fullPath.PathSlice), // clone the slice as we will append an index
-					"0")))
+			onm.orderIdx.PushBack(slices.Clone(fullPath.PathSlice)))
 	} else { // move element in the back of order list
 		onm.orderIdx.MoveToBack(onm.orderRef[fullPath.Path][len(onm.orderRef[fullPath.Path])-1])
 	}
-	return
+	return nil
 }

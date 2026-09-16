@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package config
 
@@ -176,6 +161,20 @@ func TestRPCConnsloadFromJsonCfgCase2(t *testing.T) {
 	jsonCfg.rpcConns[utils.MetaLocalHost].loadFromJSONCfg(nil)
 	if !reflect.DeepEqual(expected, jsonCfg.rpcConns) {
 		t.Errorf("Expected %+v, received %+v", utils.ToJSON(expected), utils.ToJSON(jsonCfg.rpcConns))
+	}
+}
+
+func TestRPCConnsloadFromJsonCfgRemoteHostNil(t *testing.T) {
+
+	dfltRemoteHost = nil
+	res := NewDfltRemoteHost()
+	if res == nil {
+		t.Errorf("Expected new dfltRemoteHost, got: %v", res)
+	}
+
+	exp := new(RemoteHost)
+	if !reflect.DeepEqual(exp, res) {
+		t.Errorf("Got %v, wanted %v", res, exp)
 	}
 }
 
@@ -529,5 +528,92 @@ func TestRPCConnAsMApInterface(t *testing.T) {
 
 	if !reflect.DeepEqual(rcv, exp) {
 		t.Errorf("\nexpected %s\nreceived %s\n", utils.ToJSON(exp), utils.ToJSON(rcv))
+	}
+}
+
+func TestRPCConnClone(t *testing.T) {
+	tests := []struct {
+		name string
+		rpcC *RPCConn
+	}{
+		{
+			name: "Complete RPCConn",
+			rpcC: &RPCConn{
+				Strategy: rpcclient.PoolFirst,
+				PoolSize: 0,
+				Conns: []*RemoteHost{
+					{
+						Address:   "127.0.0.1:2014",
+						Transport: rpcclient.BiRPCJSON,
+					},
+				},
+			},
+		},
+		{
+			name: "Nil Conns",
+			rpcC: &RPCConn{
+				Strategy: rpcclient.PoolFirst,
+				PoolSize: 0,
+				Conns:    nil,
+			},
+		},
+		{
+			name: "Nil RPCConn",
+			rpcC: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.rpcC.Clone()
+
+			if !reflect.DeepEqual(result, tt.rpcC) {
+				t.Errorf("Clone() = %v, want %v", result, tt.rpcC)
+			}
+
+			if result != nil && result == tt.rpcC {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+	}
+}
+
+func TestRemoteHostClone(t *testing.T) {
+	tests := []struct {
+		name       string
+		remoteHost *RemoteHost
+	}{
+		{
+			name: "Complete RemoteHost",
+			remoteHost: &RemoteHost{
+				Address:              "127.0.0.1:2012",
+				Transport:            "*json",
+				ConnectAttempts:      5,
+				Reconnects:           2,
+				ConnectTimeout:       1 * time.Minute,
+				ReplyTimeout:         1 * time.Minute,
+				TLS:                  false,
+				ClientKey:            "key_path",
+				ClientCertificate:    "cert_path",
+				CaCertificate:        "ca_path",
+				MaxReconnectInterval: 1 * time.Minute,
+			},
+		},
+		{
+			name:       "Nil RemoteHost",
+			remoteHost: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.remoteHost.Clone()
+
+			if !reflect.DeepEqual(result, tt.remoteHost) {
+				t.Errorf("Clone() = %v, want %v", result, tt.remoteHost)
+			}
+
+			if result != nil && result == tt.remoteHost {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
 	}
 }

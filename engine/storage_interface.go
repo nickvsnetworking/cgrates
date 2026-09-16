@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package engine
 
@@ -38,7 +23,6 @@ type Storage interface {
 	GetVersions(itm string) (vrs Versions, err error)
 	SetVersions(vrs Versions, overwrite bool) (err error)
 	RemoveVersions(vrs Versions) (err error)
-	SelectDatabase(dbName string) (err error)
 	GetStorageType() string
 	IsDBEmpty() (resp bool, err error)
 }
@@ -152,6 +136,8 @@ type DataDB interface {
 	DumpDataDB() error
 	RewriteDataDB() error
 	BackupDataDB(string, bool) error
+	RestoreDataDB(string) error
+	SnapshotDataDB(string, bool) error
 }
 
 type StorDB interface {
@@ -234,6 +220,8 @@ type LoadWriter interface {
 	DumpStorDB() error
 	RewriteStorDB() error
 	BackupStorDB(string, bool) error
+	RestoreStorDB(string) error
+	SnapshotStorDB(string, bool) error
 }
 
 // NewMarshaler returns the marshaler type selected by mrshlerStr

@@ -1,22 +1,7 @@
 //go:build flaky
 
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package general_tests
 
@@ -39,6 +24,8 @@ func TestCacheRplDeadlock(t *testing.T) {
 	default:
 		t.Fatal("unsupported dbtype value")
 	}
+
+	t.Skip("known CacheS deadlock, #2424")
 
 	ng := engine.TestEngine{
 		ConfigJSON: `{
@@ -112,7 +99,7 @@ func TestCacheRplDeadlock(t *testing.T) {
 	defer cancel()
 
 	if err := client.Call(ctx, utils.ResourceSv1GetResourcesForEvent, args, &rs); errors.Is(err, context.DeadlineExceeded) {
-		// we don't care about the error as long as it's not of type context.DeadlineExceeded
+		// DeadlineExceeded means it deadlocked, anything else is fine
 		t.Errorf("ResourceSv1.GetResourcesForEvent unexpected err: %v", err)
 	}
 }

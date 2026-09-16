@@ -1,24 +1,10 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package agents
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
@@ -47,12 +33,12 @@ var (
 func NewKamailioAgent(kaCfg *config.KamAgentCfg,
 	connMgr *engine.ConnManager, timezone string, caps *engine.Caps) (*KamailioAgent, error) {
 	ka := &KamailioAgent{
-		cfg:              kaCfg,
-		connMgr:          connMgr,
-		timezone:         timezone,
-		caps:             caps,
-		conns:            make([]*kamevapi.KamEvapi, len(kaCfg.EvapiConns)),
-		activeSessionIDs: make(chan []*sessions.SessionID),
+		cfg:      kaCfg,
+		connMgr:  connMgr,
+		timezone: timezone,
+		caps:     caps,
+		conns:    make([]*kamevapi.KamEvapi, len(kaCfg.EvapiConns)),
+		replyCh:  make(chan []*sessions.SessionID, len(kaCfg.EvapiConns)),
 	}
 	srv, err := birpc.NewServiceWithMethodsRename(ka, utils.AgentV1, true, func(oldFn string) (newFn string) {
 		return strings.TrimPrefix(oldFn, "V1")
@@ -65,13 +51,13 @@ func NewKamailioAgent(kaCfg *config.KamAgentCfg,
 }
 
 type KamailioAgent struct {
-	cfg              *config.KamAgentCfg
-	connMgr          *engine.ConnManager
-	timezone         string
-	caps             *engine.Caps
-	conns            []*kamevapi.KamEvapi
-	activeSessionIDs chan []*sessions.SessionID
-	ctx              *context.Context
+	cfg      *config.KamAgentCfg
+	connMgr  *engine.ConnManager
+	timezone string
+	caps     *engine.Caps
+	conns    []*kamevapi.KamEvapi
+	replyCh  chan []*sessions.SessionID
+	ctx      *context.Context
 }
 
 func (self *KamailioAgent) Connect() (err error) {
@@ -283,30 +269,25 @@ func (ka *KamailioAgent) onCallEnd(evData []byte, connIdx int) {
 }
 
 func (ka *KamailioAgent) onDlgList(evData []byte, connIdx int) {
-	kamDlgRpl, err := NewKamDlgReply(evData)
-	if err != nil {
+	var reply kamDlgReply
+	if err := json.Unmarshal(evData, &reply); err != nil {
 		utils.Logger.Err(fmt.Sprintf("<%s> unmarshalling event data: %s, error: %s",
 			utils.KamailioAgent, evData, err.Error()))
 		return
 	}
 	var sIDs []*sessions.SessionID
-	for _, dlgInfo := range kamDlgRpl.Jsonrpl_body.Result {
-		originHost := ka.conns[connIdx].RemoteAddr().String()
-		originID := dlgInfo.CallId + ";" + dlgInfo.Caller.Tag
-		for _, variable := range dlgInfo.Variables {
-			if variable.CgrOriginHost != utils.EmptyString {
-				originHost = variable.CgrOriginHost
-			}
-			if variable.CgrOriginID != utils.EmptyString {
-				originID = variable.CgrOriginID
-			}
+	if body := reply.Body; body != nil {
+		host := ka.conns[connIdx].RemoteAddr().String()
+		for _, dlg := range body.Result {
+			sIDs = append(sIDs, dlg.sessionID(host))
 		}
-		sIDs = append(sIDs, &sessions.SessionID{
-			OriginHost: originHost,
-			OriginID:   originID,
-		})
 	}
-	ka.activeSessionIDs <- sIDs
+	// kamevapi runs onDlgList in its own goroutine, so a blocking send
+	// would leak it.
+	select {
+	case ka.replyCh <- sIDs:
+	default:
+	}
 }
 
 func (ka *KamailioAgent) onCgrProcessMessage(evData []byte, connIdx int) {
@@ -469,40 +450,49 @@ func (ka *KamailioAgent) V1DisconnectSession(ctx *context.Context, cgrEv utils.C
 }
 
 // V1GetActiveSessionIDs returns a list of CGRIDs based on active sessions from agent
-func (ka *KamailioAgent) V1GetActiveSessionIDs(ctx *context.Context, ignParam string, sessionIDs *[]*sessions.SessionID) (err error) {
-	kamEv := utils.ToJSON(map[string]string{utils.Event: CGR_DLG_LIST})
-	var sentDLG int
+func (ka *KamailioAgent) V1GetActiveSessionIDs(ctx *context.Context, ignParam string, sessionIDs *[]*sessions.SessionID) error {
+	// drop stale replies from a previous sync
+	for len(ka.replyCh) > 0 {
+		<-ka.replyCh
+	}
+	kamEv, _ := json.Marshal(map[string]string{utils.Event: CGR_DLG_LIST})
+	var sent int
 	for i, evapi := range ka.conns {
-		if err := evapi.Send(kamEv); err != nil {
-			utils.Logger.Err(fmt.Sprintf("<%s> failed sending event to connIdx<%v>, error %s",
-				utils.KamailioAgent, i, err.Error()))
+		if err := evapi.Send(string(kamEv)); err != nil {
+			utils.Logger.Err(fmt.Sprintf("<%s> failed sending event to connIdx<%v>: %v",
+				utils.KamailioAgent, i, err))
 			continue
 		}
-		sentDLG++
+		sent++
 	}
-	if sentDLG == 0 {
-		return
+	if sent == 0 {
+		return errors.New("failed sending dialog list to any connection")
 	}
-	tm := time.NewTimer(config.CgrConfig().GeneralCfg().ReplyTimeout)
-	for i := 0; i < sentDLG; i++ {
+	var tmC <-chan time.Time
+	if timeout := config.CgrConfig().SessionSCfg().ChannelSyncTimeout; timeout > 0 {
+		tm := time.NewTimer(timeout)
+		defer tm.Stop()
+		tmC = tm.C
+	}
+	for range sent {
 		select {
-		case sIDs := <-ka.activeSessionIDs:
+		case sIDs := <-ka.replyCh:
 			*sessionIDs = append(*sessionIDs, sIDs...)
-		case <-tm.C:
+		case <-tmC:
 			return errors.New("timeout executing dialog list")
 		}
 	}
 	if len(*sessionIDs) == 0 {
 		return utils.ErrNoActiveSession
 	}
-	tm.Stop()
-	return
+	return nil
 }
 
 // Reload recreates the connection buffers
 // only used on reload
 func (ka *KamailioAgent) Reload() {
 	ka.conns = make([]*kamevapi.KamEvapi, len(ka.cfg.EvapiConns))
+	ka.replyCh = make(chan []*sessions.SessionID, len(ka.cfg.EvapiConns))
 }
 
 // V1AlterSession is used to implement the sessions.BiRPClient interface
@@ -517,5 +507,10 @@ func (*KamailioAgent) V1DisconnectPeer(*context.Context, *utils.DPRArgs, *string
 
 // V1WarnDisconnect is used to implement the sessions.BiRPClient interface
 func (*KamailioAgent) V1WarnDisconnect(*context.Context, map[string]any, *string) error {
+	return utils.ErrNotImplemented
+}
+
+// V1SpendingStatusNotification is used to implement the sessions.BiRPClient interface
+func (*KamailioAgent) V1SpendingStatusNotification(*context.Context, *utils.CGREvent, *string) error {
 	return utils.ErrNotImplemented
 }

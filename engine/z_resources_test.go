@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package engine
 
 import (
@@ -110,11 +96,12 @@ func TestResourceUsageClone(t *testing.T) {
 
 func TestResourceTenantID(t *testing.T) {
 	testStruct := Resource{
+		ID:     "id1",
 		Tenant: "test_tenant",
 	}
 	result := testStruct.TenantID()
-	if reflect.DeepEqual(testStruct.Tenant, result) {
-		t.Errorf("\nExpecting <%+v>,\n Received <%+v>", testStruct.Tenant, result)
+	if !reflect.DeepEqual(testStruct.Tenant+utils.InInFieldSep+testStruct.ID, result) {
+		t.Errorf("\nExpecting <%+v>,\n Received <%+v>", testStruct.Tenant+utils.InInFieldSep+testStruct.ID, result)
 	}
 }
 
@@ -138,7 +125,7 @@ func TestResourceTotalUsage1(t *testing.T) {
 		},
 	}
 	result := testStruct.TotalUsage()
-	if reflect.DeepEqual(3, result) {
+	if !reflect.DeepEqual(3.0, result) {
 		t.Errorf("\nExpecting <3>,\n Received <%+v>", result)
 	}
 }
@@ -162,9 +149,10 @@ func TestResourceTotalUsage2(t *testing.T) {
 			},
 		},
 	}
+	exp := 3.0
 	result := testStruct.TotalUsage()
-	if reflect.DeepEqual(3, result) {
-		t.Errorf("\nExpecting <3>,\n Received <%+v>", result)
+	if !reflect.DeepEqual(exp, result) {
+		t.Errorf("\nExpecting <%+v>,\n Received <%+v>", exp, result)
 	}
 }
 
@@ -187,7 +175,7 @@ func TestResourcesRecordUsage(t *testing.T) {
 		ExpiryTime: time.Date(2016, 1, 14, 0, 0, 0, 0, time.UTC),
 		Units:      1,
 	}
-	expStruct := Resource{
+	expStruct := &Resource{
 		Tenant: "test_tenant",
 		ID:     "test_id",
 		Usages: map[string]*ResourceUsage{
@@ -204,12 +192,13 @@ func TestResourcesRecordUsage(t *testing.T) {
 				Units:      1,
 			},
 		},
+		TTLIdx: []string{"test_id3"},
 	}
 	err := testStruct.recordUsage(recordStruct)
 	if err != nil {
 		t.Errorf("\nExpecting <nil>,\n Received <%+v>", err)
 	}
-	if reflect.DeepEqual(testStruct, expStruct) {
+	if !reflect.DeepEqual(testStruct, expStruct) {
 		t.Errorf("\nExpecting <%+v>,\n Received <%+v>", expStruct, testStruct)
 	}
 }
@@ -233,7 +222,7 @@ func TestResourcesClearUsage(t *testing.T) {
 			},
 		},
 	}
-	expStruct := Resource{
+	expStruct := &Resource{
 		Tenant: "test_tenant",
 		ID:     "test_id",
 		Usages: map[string]*ResourceUsage{
@@ -249,7 +238,7 @@ func TestResourcesClearUsage(t *testing.T) {
 	if err != nil {
 		t.Errorf("\nExpecting <nil>,\n Received <%+v>", err)
 	}
-	if reflect.DeepEqual(testStruct, expStruct) {
+	if !reflect.DeepEqual(testStruct, expStruct) {
 		t.Errorf("\nExpecting <%+v>,\n Received <%+v>", expStruct, testStruct)
 	}
 }
@@ -5480,7 +5469,7 @@ func TestResourcesV1ReleaseResourcesProcessThErr(t *testing.T) {
 	dm.DataDB().Flush(utils.EmptyString)
 }
 
-func TestResourcesStoreResourceError(t *testing.T) {
+func TestResourcesStoreIgnoresReplicationFailure(t *testing.T) {
 	Cache.Clear(nil)
 	cfg := config.NewDefaultCGRConfig()
 	cfg.ResourceSCfg().StoreInterval = -1
@@ -5530,8 +5519,10 @@ func TestResourcesStoreResourceError(t *testing.T) {
 	}
 	cfg.DataDbCfg().Items[utils.MetaResources].Replicate = true
 	var reply string
-	if err := rS.V1AllocateResources(context.Background(), args, &reply); err != utils.ErrDisconnected {
+	if err := rS.V1AllocateResources(context.Background(), args, &reply); err != nil {
 		t.Error(err)
+	} else if reply != "Approved" {
+		t.Errorf("Unexpected reply returned: %q", reply)
 	}
 	cfg.DataDbCfg().Items[utils.MetaResources].Replicate = false
 
@@ -5542,7 +5533,7 @@ func TestResourcesStoreResourceError(t *testing.T) {
 	}
 
 	cfg.DataDbCfg().Items[utils.MetaResources].Replicate = true
-	if err := rS.V1ReleaseResources(context.Background(), args, &reply); err != utils.ErrDisconnected {
+	if err := rS.V1ReleaseResources(context.Background(), args, &reply); err != nil {
 		t.Error(err)
 	}
 }

@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package config
 
@@ -299,7 +284,7 @@ func TestDispatcherHCfgAsMapInterface2(t *testing.T) {
 	}
 }
 
-func TestDispatcherHCfgClone(t *testing.T) {
+func TestRegistrarCCfgClone(t *testing.T) {
 	ban := &RegistrarCCfg{
 		RegistrarSConns: []string{"*conn1", "*conn2"},
 		Hosts: map[string][]*RemoteHost{
@@ -337,5 +322,97 @@ func TestDispatcherHCfgClone(t *testing.T) {
 	}
 	if rcv.Hosts[utils.MetaDefault][0].ID = ""; ban.Hosts[utils.MetaDefault][0].ID != "Host1" {
 		t.Errorf("Expected clone to not modify the cloned")
+	}
+
+	ban = nil
+	rcv = ban.Clone()
+	if !reflect.DeepEqual(ban, rcv) {
+		t.Errorf("Expected: %+v\nReceived: %+v", utils.ToJSON(ban), utils.ToJSON(rcv))
+	}
+}
+
+func TestRegistrarCCfgsClone(t *testing.T) {
+	tests := []struct {
+		name           string
+		registrarCCfgs *RegistrarCCfgs
+	}{
+		{
+			name: "Complete RegistrarCCfgs",
+			registrarCCfgs: &RegistrarCCfgs{
+				RPC: &RegistrarCCfg{
+					RegistrarSConns: []string{"*conn1", "*conn2"},
+					Hosts: map[string][]*RemoteHost{
+						utils.MetaDefault: {
+							{
+								ID:        "Host1",
+								Transport: utils.MetaJSON,
+							},
+							{
+								ID:        "Host2",
+								Transport: utils.MetaGOB,
+							},
+						},
+						"cgrates.net": {
+							{
+								ID:        "Host1",
+								Transport: utils.MetaJSON,
+								TLS:       true,
+							},
+							{
+								ID:        "Host2",
+								Transport: utils.MetaGOB,
+								TLS:       true,
+							},
+						},
+					},
+					RefreshInterval: 5,
+				},
+				Dispatchers: &RegistrarCCfg{
+					RegistrarSConns: []string{"*conn1", "*conn2"},
+					Hosts: map[string][]*RemoteHost{
+						utils.MetaDefault: {
+							{
+								ID:        "Host1",
+								Transport: utils.MetaJSON,
+							},
+							{
+								ID:        "Host2",
+								Transport: utils.MetaGOB,
+							},
+						},
+						"cgrates.net": {
+							{
+								ID:        "Host1",
+								Transport: utils.MetaJSON,
+								TLS:       true,
+							},
+							{
+								ID:        "Host2",
+								Transport: utils.MetaGOB,
+								TLS:       true,
+							},
+						},
+					},
+					RefreshInterval: 5,
+				},
+			},
+		},
+		{
+			name:           "Nil RegistrarCCfgs",
+			registrarCCfgs: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.registrarCCfgs.Clone()
+
+			if !reflect.DeepEqual(result, tt.registrarCCfgs) {
+				t.Errorf("Clone() = %v, want %v", result, tt.registrarCCfgs)
+			}
+
+			if result != nil && result == tt.registrarCCfgs {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
 	}
 }

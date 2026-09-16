@@ -1,23 +1,9 @@
 //go:build integration
 // +build integration
 
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package config
 
 import (
@@ -453,17 +439,18 @@ func testCGRConfigReloadCDRs(t *testing.T) {
 		t.Fatal(err)
 	}
 	expAttr := &CdrsCfg{
-		Enabled:         true,
-		ExtraFields:     rsr,
-		ChargerSConns:   []string{utils.MetaLocalHost},
-		RaterConns:      []string{},
-		AttributeSConns: []string{},
-		ThresholdSConns: []string{},
-		StatSConns:      []string{},
-		SMCostRetries:   5,
-		StoreCdrs:       true,
-		SchedulerConns:  []string{},
-		EEsConns:        []string{utils.MetaLocalHost},
+		Enabled:          true,
+		ExtraFields:      rsr,
+		ChargerSConns:    []string{utils.MetaLocalHost},
+		RaterConns:       []string{},
+		AttributeSConns:  []string{},
+		ThresholdSConns:  []string{},
+		StatSConns:       []string{},
+		SMCostRetries:    5,
+		StoreCdrs:        true,
+		OnlineCDRExports: []string{},
+		SchedulerConns:   []string{},
+		EEsConns:         []string{utils.MetaLocalHost},
 	}
 	if !reflect.DeepEqual(expAttr, cfg.CdrsCfg()) {
 		t.Errorf("Expected %s , received: %s ", utils.ToJSON(expAttr), utils.ToJSON(cfg.CdrsCfg()))
@@ -524,6 +511,7 @@ func testCGRConfigReloadSessionS(t *testing.T) {
 	}
 	expAttr := &SessionSCfg{
 		Enabled:         true,
+		ApierSConns:     []string{},
 		ChargerSConns:   []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaChargers)},
 		RALsConns:       []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaResponder)},
 		IPsConns:        []string{},
@@ -544,7 +532,8 @@ func testCGRConfigReloadSessionS(t *testing.T) {
 			PayloadMaxduration: -1,
 			DefaultAttest:      "A",
 		},
-		SchedulerConns: []string{},
+		SchedulerConns:     []string{},
+		ChannelSyncTimeout: 60 * time.Second,
 		DefaultUsage: map[string]time.Duration{
 			utils.MetaAny:   3 * time.Hour,
 			utils.MetaVoice: 3 * time.Hour,
@@ -622,7 +611,6 @@ func testCGRConfigReloadERs(t *testing.T) {
 				PartialCommitFields:  []*FCTemplate{},
 				Reconnects:           -1,
 				MaxReconnectInterval: 5 * time.Minute,
-				EEsIDs:               []string{},
 				EEsSuccessIDs:        []string{},
 				EEsFailedIDs:         []string{},
 				Opts: &EventReaderOpts{
@@ -656,7 +644,6 @@ func testCGRConfigReloadERs(t *testing.T) {
 				PartialCommitFields:  []*FCTemplate{},
 				Reconnects:           -1,
 				MaxReconnectInterval: 5 * time.Minute,
-				EEsIDs:               []string{},
 				EEsSuccessIDs:        []string{},
 				EEsFailedIDs:         []string{},
 				Opts: &EventReaderOpts{
@@ -979,6 +966,7 @@ func testCGRConfigReloadConfigFromJSONSessionS(t *testing.T) {
 	}
 	expAttr := &SessionSCfg{
 		Enabled:         true,
+		ApierSConns:     []string{},
 		ChargerSConns:   []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaChargers)},
 		RALsConns:       []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaResponder)},
 		IPsConns:        []string{utils.MetaLocalHost},
@@ -999,7 +987,8 @@ func testCGRConfigReloadConfigFromJSONSessionS(t *testing.T) {
 			PayloadMaxduration: -1,
 			DefaultAttest:      "A",
 		},
-		SchedulerConns: []string{},
+		SchedulerConns:     []string{},
+		ChannelSyncTimeout: 60 * time.Second,
 		DefaultUsage: map[string]time.Duration{
 			utils.MetaAny:   3 * time.Hour,
 			utils.MetaVoice: 3 * time.Hour,
@@ -1041,6 +1030,7 @@ func testCGRConfigReloadConfigFromStringSessionS(t *testing.T) {
 	}
 	expAttr := &SessionSCfg{
 		Enabled:         true,
+		ApierSConns:     []string{},
 		ChargerSConns:   []string{utils.MetaLocalHost},
 		RALsConns:       []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaResponder)},
 		IPsConns:        []string{utils.MetaLocalHost},
@@ -1061,7 +1051,8 @@ func testCGRConfigReloadConfigFromStringSessionS(t *testing.T) {
 			PayloadMaxduration: -1,
 			DefaultAttest:      "A",
 		},
-		SchedulerConns: []string{},
+		SchedulerConns:     []string{},
+		ChannelSyncTimeout: 60 * time.Second,
 		DefaultUsage: map[string]time.Duration{
 			utils.MetaAny:   3 * time.Hour,
 			utils.MetaVoice: 3 * time.Hour,
@@ -1074,7 +1065,7 @@ func testCGRConfigReloadConfigFromStringSessionS(t *testing.T) {
 	}
 
 	var rcv string
-	expected := `{"sessions":{"alterable_fields":[],"attributes_conns":["*localhost"],"backup_interval":"0","cdrs_conns":["*internal"],"channel_sync_interval":"0","chargers_conns":["*localhost"],"client_protocol":2,"debit_interval":"0","default_usage":{"*any":"3h0m0s","*data":"1048576","*sms":"1","*voice":"3h0m0s"},"enabled":true,"ips_conns":["*localhost"],"min_dur_low_balance":"0","rals_conns":["*internal"],"replication_conns":[],"resources_conns":["*localhost"],"routes_conns":["*localhost"],"scheduler_conns":[],"session_indexes":[],"session_ttl":"0","stale_chan_max_extra_usage":"0","stats_conns":[],"stir":{"allowed_attest":["*any"],"default_attest":"A","payload_maxduration":"-1","privatekey_path":"","publickey_path":""},"store_session_costs":false,"terminate_attempts":5,"thresholds_conns":[]}}`
+	expected := `{"sessions":{"alterable_fields":[],"apiers_conns":[],"attributes_conns":["*localhost"],"backup_interval":"0","cdrs_conns":["*internal"],"channel_sync_interval":"0","channel_sync_timeout":"1m0s","chargers_conns":["*localhost"],"client_protocol":2,"debit_interval":"0","default_usage":{"*any":"3h0m0s","*data":"1048576","*sms":"1","*voice":"3h0m0s"},"enabled":true,"ips_conns":["*localhost"],"min_dur_low_balance":"0","rals_conns":["*internal"],"replication_conns":[],"resources_conns":["*localhost"],"routes_conns":["*localhost"],"scheduler_conns":[],"session_indexes":[],"session_ttl":"0","stale_chan_max_extra_usage":"0","stats_conns":[],"stir":{"allowed_attest":["*any"],"default_attest":"A","payload_maxduration":"-1","privatekey_path":"","publickey_path":""},"store_session_costs":false,"terminate_attempts":5,"thresholds_conns":[]}}`
 
 	if err := cfg.V1GetConfigAsJSON(context.Background(), &SectionWithAPIOpts{Section: SessionSJson}, &rcv); err != nil {
 		t.Error(err)
@@ -1103,6 +1094,7 @@ func testCGRConfigReloadAll(t *testing.T) {
 	}
 	expAttr := &SessionSCfg{
 		Enabled:         true,
+		ApierSConns:     []string{},
 		ChargerSConns:   []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaChargers)},
 		RALsConns:       []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaResponder)},
 		IPsConns:        []string{},
@@ -1123,7 +1115,8 @@ func testCGRConfigReloadAll(t *testing.T) {
 			PayloadMaxduration: -1,
 			DefaultAttest:      "A",
 		},
-		SchedulerConns: []string{},
+		SchedulerConns:     []string{},
+		ChannelSyncTimeout: 60 * time.Second,
 		DefaultUsage: map[string]time.Duration{
 			utils.MetaAny:   3 * time.Hour,
 			utils.MetaVoice: 3 * time.Hour,

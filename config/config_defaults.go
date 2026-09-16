@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package config
 
@@ -144,20 +129,19 @@ const CGRATES_CFG_JSON = `
 	},
 	"opts":{
 		"internalDBDumpPath": "/var/lib/cgrates/internal_db/datadb",		// the path where datadb will be dumped
-		"internalDBBackupPath": "/var/lib/cgrates/internal_db/backup/datadb", // default path taken by APIerSv1.BackupDataDBDump when "BackupFolderPath" is not provided
+		"internalDBBackupPath": "/var/lib/cgrates/internal_db/backup/datadb", // default path taken by APIerSv1.BackupDataDB when "BackupFolderPath" is not provided
 		"internalDBStartTimeout": "5m",		// the amount of wait time until timeout for DB startup
 		"internalDBDumpInterval": "0s",		// dump datadb regularly to a file: "0" - disables it; "-1" - dump on each set/remove; <""|$dur>
 		"internalDBRewriteInterval": "0s",	// rewrite dump files regularly: "0" - disables it; "-1" - rewrite on engine start; "-2" - rewrite on engine shutdown; <""|$dur>
 		"internalDBFileSizeLimit": "1GB",	// maximum size that can be written in a singular dump file 
+		"redisBatchSize": 1000,         // COUNT size used in redis SCAN queries
 		"redisMaxConns": 10,			// the connection pool size
 		"redisConnectAttempts": 20,		// the maximum amount of dial attempts
 		"redisSentinel": "",			// the name of sentinel when used
 		"redisCluster": false,			// if enabled the datadb will try to connect to the redis cluster
 		"redisClusterSync": "5s",		// the sync interval for the redis cluster
 		"redisClusterOndownDelay": "0",		// the delay before executing the commands if the redis cluster is in the CLUSTERDOWN state
-		"redisConnectTimeout": "0",		// the amount of wait time until timeout for a connection attempt
-		"redisReadTimeout": "0",		// the amount of wait time until timeout for reading operations
-		"redisWriteTimeout": "0",   		// the amount of wait time until timeout for writing operations
+		"redisConnectTimeout": "0",		// the read/write timeout for each connection.
 		"redisPoolPipelineWindow": "150µs",	// duration after which internal pipelines are flushed (0 disables implicit pipelining)
 		"redisPoolPipelineLimit": 0,        	// maximum number of commands that can be pipelined before flushing (0 means no limit)
 		"redisTLS": false,			// if true it will use a tls connection and use the redisClientCertificate, redisClientKey and redisCACertificate for tls connection
@@ -181,7 +165,7 @@ const CGRATES_CFG_JSON = `
 	"prefix_indexed_fields":[],		// prefix indexes on cdrs table to speed up queries, used in case of *internal
 	"opts": {
 		"internalDBDumpPath": "/var/lib/cgrates/internal_db/stordb",		// the path where stordb will be dumped
-		"internalDBBackupPath": "/var/lib/cgrates/internal_db/backup/stordb", // default path taken by APIerSv1.BackupStorDBDump when "BackupFolderPath" is not provided
+		"internalDBBackupPath": "/var/lib/cgrates/internal_db/backup/stordb", // default path taken by APIerSv1.BackupStorDB when "BackupFolderPath" is not provided
 		"internalDBStartTimeout": "5m",		// the amount of wait time until timeout for DB startup
 		"internalDBDumpInterval": "0s",		// dump datadb regularly to a file: "0" - disables it; "-1" - dump on each set/remove; <""|$dur>
 		"internalDBRewriteInterval": "0s",	// rewrite dump files regularly: "0" - disables it; "-1" - rewrite on engine start; "-2" - rewrite on engine shutdown; <""|$dur>
@@ -434,7 +418,6 @@ const CGRATES_CFG_JSON = `
 			"filters": [],						// limit parsing based on the filters
 			"flags": [],						// flags to influence the event processing
 			"reconnects": -1,					// number of retries in case of connection lost
-			"ees_ids": [], 						// ids of exporters used for moving the processed event to EEs
 			"ees_success_ids": [],					// ids of exporters used for moving the raw event to EEs
 			"ees_failed_ids": [],					// ids of exporters used for moving the failed raw event to EEs
 			"max_reconnect_interval": "5m", 			// time to wait in between reconnect attempts
@@ -444,6 +427,8 @@ const CGRATES_CFG_JSON = `
 				"partialCacheAction": "*none",			// the action that will be executed for the partial CSVs that are not matched<*none|*post_cdr|*dump_to_file>
 				"partialOrderField": "~*req.AnswerTime",	// the field after what the events are order when merged
 				// "partialcsvFieldSeparator": ","		// separator used when dumping the fields
+
+				// "ignoreErroredItems": false,			// skip items that fail processing instead of aborting the reader
 				
 				// FileCSV 
 				"csvRowLength": 0,				// Number of fields from csv file, -1 to disable checking, 0 to inherit the lenght of first record
@@ -565,7 +550,6 @@ const CGRATES_CFG_JSON = `
 
 				
  				// Elasticsearch options
-				// "elsCloud": true,			// if true, use cloud ID deployment
 				// "elsApiKey": "",			// base64-encoded token for auth; overrides username/password and service token
 				// "elsUsername": "",			// username for HTTP Basic Authentication
 				// "elsPassword": "",			// password for HTTP Basic Authentication
@@ -606,7 +590,8 @@ const CGRATES_CFG_JSON = `
 				
 				// Kafka
 				// "kafkaTopic": "cgrates_cdrs",	// the topic from where the events are exported
-				// "kafkaBatchSize": 100,		// limit on how many messages will be buffered before being sent
+				// "kafkaLinger": "10ms",		// how long to wait for more records before sending a batch
+				// "kafkaDeliveryTimeout": "30s",	// max time to wait for a message to be delivered
 				// "kafkaTLS": false,			// if true, it will try to authenticate the server
 				// "kafkaCAPath": "", 			// path to certificate authority pem
 				// "kafkaSkipTLSVerify: false, 		// if true it will skip certificate verification
@@ -668,6 +653,7 @@ const CGRATES_CFG_JSON = `
 
 "sessions": {
 	"enabled": false,			// starts the session service: <true|false>
+	"apiers_conns": [],			// connections to ApierS, empty to disable: <""|*internal|$rpc_conns_id>
 	"chargers_conns": [],			// connections to ChargerS for session forking <""|*internal|$rpc_conns_id>
 	"rals_conns": [],			// connections to RALs for rating/accounting <""|*internal|$rpc_conns_id>
 	"cdrs_conns": [],			// connections to CDRs for CDR posting <""|*internal|$rpc_conns_id>
@@ -694,6 +680,7 @@ const CGRATES_CFG_JSON = `
 	"session_indexes": [],			// index sessions based on these fields for GetActiveSessions API
 	"client_protocol": 2.0,			// version of protocol to use when acting as JSON-PRC client <"0","1.0","2.0">
 	"channel_sync_interval": "0",		// sync channels to detect stale sessions (0 to disable)
+	"channel_sync_timeout": "60s",		// max time to wait for a client's active sessions during sync (0 for unlimited)
 	"stale_chan_max_extra_usage": "0",	// add random usage below max for stale channels
 	"terminate_attempts": 5,		// attempts to get the session before terminating it
 	"alterable_fields": [],			// the session fields that can be updated
@@ -780,6 +767,7 @@ const CGRATES_CFG_JSON = `
 	   }
 	],
 	"dictionaries_path": "/usr/share/cgrates/diameter/dict/",	// path towards directory holding additional dictionaries to load
+	"dictionaries_append_defaults": true,         // if true, dictionaries from the provided path will be appended to the default dictionaries from the go-diameter library
 	// "ce_applications": [],					// list of applications in dictionaries wanted to be included in Capability-Exchange. Needed either "app name", "app ID", or "vendor name.app name/ID"
 	"sessions_conns": ["*birpc_internal"],
 	"stats_conns": [],						// connections to StatS, empty to disable: <""|*internal|$rpc_conns_id>
@@ -791,6 +779,9 @@ const CGRATES_CFG_JSON = `
 	"synced_conn_requests": false,					// process one request at the time per connection
 	"asr_template": "",						// enable AbortSession message being sent to client on DisconnectSession
 	"rar_template": "",						// template used to build the Re-Auth-Request
+	"slr_template": "",						// default SLR template 
+	"snr_template": "",						// template used to build the Spending-Status-Notification-Request
+	"str_template": "",						// default STR template 
 	"forced_disconnect": "*none",					// the request to send to diameter on DisconnectSession <*none|*asr|*rar>
 	"conn_status_stat_queue_ids": [],				// StatQueue IDs for connection status events
 	"conn_status_threshold_ids": [],				// Threshold IDs for connection status events
@@ -1075,9 +1066,7 @@ const CGRATES_CFG_JSON = `
 		"redisCluster": false,
 		"redisClusterSync": "5s",
 		"redisClusterOndownDelay": "0",
-		"redisConnectTimeout": "0",		// the amount of wait time until timeout for a connection attempt
-		"redisReadTimeout": "0",		// the amount of wait time until timeout for reading operations
-		"redisWriteTimeout": "0",   		// the amount of wait time until timeout for writing operations
+		"redisConnectTimeout": "0",		// the read/write timeout for each connection.
 		"redisPoolPipelineWindow": "150µs",	// duration after which internal pipelines are flushed (0 disables implicit pipelining)
 		"redisPoolPipelineLimit": 0,		// maximum number of commands that can be pipelined before flushing (0 means no limit)
 		"redisTLS": false,			// enable TLS when connecting to Redis and use the redisClientCertificate, redisClientKey and redisCACertificate for TLS connection
@@ -1221,6 +1210,54 @@ const CGRATES_CFG_JSON = `
 			 "value": "~*vars.*appid", "mandatory": true},
 		{"tag": "ReAuthRequestType", "path": "*diamreq.Re-Auth-Request-Type", "type": "*constant",
 			"value": "0"},
+	],
+	"*slr": [
+		{"tag": "OriginID", "path": "*cgreq.OriginID", "type": "*variable",
+			"value": "~*req.Session-Id", "mandatory": true},
+		{"tag": "OriginHost", "path": "*cgreq.OriginHost", "type": "*variable",
+			"value": "~*req.Origin-Host", "mandatory": true},
+		{"tag": "OriginRealm", "path": "*cgreq.OriginRealm", "type": "*variable",
+			"value": "~*req.Origin-Realm", "mandatory": true},
+		{"tag": "Account", "path": "*cgreq.Account", "type": "*variable",
+			"value": "~*req.Subscription-Id.Subscription-Id-Data[~Subscription-Id-Type(0)]"},
+		{"tag": "RequestType", "path": "*cgreq.RequestType", "type": "*constant",
+			"value": "*sy"},
+		{"tag": "BalanceIDPolicyFilter", "path": "*opts.*syPolicyFilters", "type": "*group",
+			"value": "*string:~*asm.BalanceSummaries.*default.ID:balance_data", "mandatory": true},
+		{"tag": "BalanceIDPolicyFilter2", "path": "*opts.*syPolicyFilters", "type": "*group",
+			"value": "*lte:~*asm.BalanceSummaries.balance_data.Value:0", "mandatory": true}
+	],
+	"*snr": [
+		{"tag": "SessionId", "path": "*diamreq.Session-Id", "type": "*variable",
+			"value": "~*req.Session-Id", "mandatory": true},
+		{"tag": "OriginHost", "path": "*diamreq.Origin-Host", "type": "*variable",
+			"value": "~*req.Origin-Host", "mandatory": true},
+		{"tag": "OriginRealm", "path": "*diamreq.Origin-Realm", "type": "*variable",
+			"value": "~*req.Origin-Realm", "mandatory": true},
+		{"tag": "DestinationRealm", "path": "*diamreq.Destination-Realm", "type": "*variable",
+			"value": "~*req.Destination-Realm", "mandatory": true},
+		{"tag": "DestinationHost", "path": "*diamreq.Destination-Host", "type": "*variable",
+			"value": "~*req.Destination-Host", "mandatory": true},
+		{"tag": "AuthApplicationId", "path": "*diamreq.Auth-Application-Id", "type": "*variable",
+			 "value": "~*vars.*appid", "mandatory": true},
+		{"tag": "Policy-Counter-Identifier", "path": "*diamreq.Policy-Counter-Status-Report.Policy-Counter-Identifier", "type": "*group", 
+			"value": "Monthly", "new_branch": true},
+		{"tag": "Policy-Counter-Status", "path": "*diamreq.Policy-Counter-Status-Report.Policy-Counter-Status", "type": "*group", 
+			"value": "512KBPS"},
+        {"tag": "Pending-Policy-Counter-Information-Status", "path": "*diamreq.Policy-Counter-Status-Report.Pending-Policy-Counter-Information.Policy-Counter-Status", "type": "*group", 
+			"value": "30GB"},
+        {"tag": "Pending-Policy-Counter-Information-Status-Change-Time", "path": "*diamreq.Policy-Counter-Status-Report.Pending-Policy-Counter-Information.Pending-Policy-Counter-Change-Time", "type": "*datetime", 
+			"value": "*now"}
+	],
+	"*str": [
+		{"tag": "OriginID", "path": "*cgreq.OriginID", "type": "*variable",
+			"value": "~*req.Session-Id", "mandatory": true},
+		{"tag": "OriginHost", "path": "*cgreq.OriginHost", "type": "*variable",
+			"value": "~*req.Origin-Host", "mandatory": true},
+		{"tag": "OriginRealm", "path": "*cgreq.OriginRealm", "type": "*variable",
+			"value": "~*req.Origin-Realm", "mandatory": true},
+		{"tag": "RequestType", "path": "*cgreq.RequestType", "type": "*constant",
+			"value": "*sy"}
 	],
 	"*dmr": [  // used by RadiusAgent when sending Disconnect message towards the client
 		{"tag": "User-Name", "path": "*radDAReq.User-Name", "type": "*variable", 

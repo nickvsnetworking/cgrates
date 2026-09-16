@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package utils
 
@@ -125,6 +110,8 @@ func NewDataConverter(params string) (conv DataConverter, err error) {
 			paramsStr = params[len(MetaTimeString)+1:]
 		}
 		return NewTimeStringConverter(paramsStr)
+	case strings.HasPrefix(params, MetaDateTime):
+		return NewDateTimeConverter(params)
 	case strings.HasPrefix(params, MetaRandom):
 		if len(params) == len(MetaRandom) { // no extra params, defaults implied
 			return NewRandomConverter(EmptyString)
@@ -893,4 +880,26 @@ func (c *ULIConverter) Convert(in any) (any, error) {
 	}
 
 	return uli.GetField(c.path)
+}
+
+type DateTimeConverter struct {
+	inlayout string
+}
+
+func NewDateTimeConverter(params string) (DataConverter, error) {
+	_, layout, ok := strings.Cut(params, ":")
+	if !ok || layout == "" {
+		return nil, fmt.Errorf("*datetime converter: requires at least one parameter")
+	}
+	return &DateTimeConverter{inlayout: layout}, nil
+}
+
+func (dt *DateTimeConverter) Convert(in any) (any, error) {
+	inStr := IfaceAsString(in)
+	tm, err := time.Parse(dt.inlayout, inStr)
+	if err != nil {
+		return nil, fmt.Errorf("*datetime converter: parsing failed for value %q with layout %q: %w",
+			inStr, dt.inlayout, err)
+	}
+	return tm, nil
 }

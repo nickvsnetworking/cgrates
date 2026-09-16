@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package ees
 
@@ -39,7 +24,7 @@ func TestSetFldPostCacheTTL(t *testing.T) {
 
 func TestAddFldPost(t *testing.T) {
 	InitFailedPostCache(5*time.Second, false)
-	AddFailedPost("", "path1", "format1", 1, "1", &config.EventExporterOpts{
+	AddFailedPost("", "path1", "format1", 1, false, "1", &config.EventExporterOpts{
 		AMQP:  &config.AMQPOpts{},
 		Els:   &config.ElsOpts{},
 		AWS:   &config.AWSOpts{},
@@ -78,7 +63,7 @@ func TestAddFldPost(t *testing.T) {
 	if !reflect.DeepEqual(eOut, failedPost) {
 		t.Errorf("Expecting: %+v, received: %+v", utils.ToJSON(eOut), utils.ToJSON(failedPost))
 	}
-	AddFailedPost("", "path1", "format1", 1, "2", &config.EventExporterOpts{
+	AddFailedPost("", "path1", "format1", 1, false, "2", &config.EventExporterOpts{
 		AMQP:  &config.AMQPOpts{},
 		Els:   &config.ElsOpts{},
 		AWS:   &config.AWSOpts{},
@@ -87,7 +72,7 @@ func TestAddFldPost(t *testing.T) {
 		RPC:   &config.RPCOpts{},
 		SQL:   &config.SQLOpts{},
 	})
-	AddFailedPost("", "path2", "format2", 1, "3", &config.EventExporterOpts{
+	AddFailedPost("", "path2", "format2", 1, false, "3", &config.EventExporterOpts{
 		AWS: &config.AWSOpts{
 			SQSQueueID: utils.StringPointer("qID"),
 		},

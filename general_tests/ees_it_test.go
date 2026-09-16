@@ -1,27 +1,16 @@
 //go:build integration
 // +build integration
 
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package general_tests
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os/exec"
 	"testing"
 	"time"
@@ -140,7 +129,7 @@ func TestEEsExportEventChanges(t *testing.T) {
 						Type: utils.MetaVariable,
 						Value: config.RSRParsers{
 							&config.RSRParser{
-								Rules: `{"CGRID":"","RunID":"","StartTime":"0001-01-01T00:00:00Z","Usage":null,"Cost":null,"Charges":[{"RatingID":"","Increments":[{"Usage":0,"Cost":0,"AccountingID":"ACCOUNTING_TEST","CompressFactor":0}],"CompressFactor":0}],"AccountSummary":{"Tenant":"","ID":"","BalanceSummaries":[{"UUID":"123456","ID":"BALANCE_TEST","Type":"*voice","Initial":0,"Value":11,"Disabled":false}],"AllowNegative":false,"Disabled":false},"Rating":null,"Accounting":{"ACCOUNTING_TEST":{"AccountID":"","BalanceUUID":"123456","RatingID":"","Units":0,"ExtraChargeID":""}},"RatingFilters":null,"Rates":null,"Timings":null}`,
+								Rules: `{"CGRID":"","RunID":"","StartTime":"0001-01-01T00:00:00Z","Usage":null,"Cost":null,"Charges":[{"RatingID":"","Increments":[{"Usage":0,"Cost":0,"AccountingID":"ACCOUNTING_TEST","CompressFactor":0}],"CompressFactor":0}],"AccountSummary":{"Tenant":"","AccountID":"","BalanceSummaries":[{"UUID":"123456","ID":"BALANCE_TEST","Type":"*voice","Initial":0,"Value":11,"Disabled":false}],"AllowNegative":false,"Disabled":false},"Rating":null,"Accounting":{"ACCOUNTING_TEST":{"AccountID":"","BalanceUUID":"123456","RatingID":"","Units":0,"ExtraChargeID":""}},"RatingFilters":null,"Rates":null,"Timings":null}`,
 							},
 						},
 					},
@@ -527,4 +516,163 @@ func TestEEsReplayFailedPosts(t *testing.T) {
 			t.Errorf("unexpected nats messages received over channel (-want +got): \n%s", diff)
 		}
 	})
+}
+
+func TestEEsHTTPJsonMapNestedExport(t *testing.T) {
+	switch *utils.DBType {
+	case utils.MetaInternal:
+	case utils.MetaMySQL, utils.MetaMongo, utils.MetaPostgres:
+		t.SkipNow()
+	default:
+		t.Fatal("unsupported dbtype value")
+	}
+
+	type httpResult struct {
+		body map[string]any
+		err  error
+	}
+	ch := make(chan httpResult, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		defer r.Body.Close()
+		var body map[string]any
+		err := json.NewDecoder(r.Body).Decode(&body)
+		ch <- httpResult{body, err}
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer srv.Close()
+
+	content := fmt.Sprintf(`{
+
+"general": {
+	"log_level": 7
+},
+
+"data_db": {
+	"db_type": "*internal"
+},
+
+"stor_db": {
+	"db_type": "*internal"
+},
+
+"ees": {
+	"enabled": true,
+	"exporters": [
+		{
+			"id": "nested_json",
+			"type": "*http_json_map",
+			"export_path": "%s/",
+			"attempts": 1,
+			"synchronous": true,
+			"fields": [
+				{
+					"tag": "OriginID",
+					"path": "*exp.OriginID",
+					"type": "*variable",
+					"value": "~*req.OriginID"
+				},
+				{
+					"tag": "Account",
+					"path": "*exp.Account",
+					"type": "*variable",
+					"value": "~*req.Account"
+				},
+				{
+					"tag": "Category",
+					"path": "*exp.billing.Category",
+					"type": "*variable",
+					"value": "~*req.Category"
+				},
+				{
+					"tag": "RequestType",
+					"path": "*exp.billing.RequestType",
+					"type": "*variable",
+					"value": "~*req.RequestType"
+				},
+				{
+					"tag": "Usage",
+					"path": "*exp.Usage",
+					"type": "*variable",
+					"value": "~*req.Usage"
+				},
+				{
+					"tag": "Cost",
+					"path": "*exp.Cost",
+					"type": "*variable",
+					"value": "~*req.Cost"
+				},
+				{
+					"tag": "Extra1",
+					"path": "*exp.ExtraInfo",
+					"type": "*group",
+					"value": "~*req.Extra1"
+				},
+				{
+					"tag": "Extra2",
+					"path": "*exp.ExtraInfo",
+					"type": "*group",
+					"value": "~*req.Extra2"
+				},
+				{
+					"tag": "Tag",
+					"path": "*exp.Tag",
+					"type": "*group",
+					"value": "~*req.Tag"
+				}
+			]
+		}
+	]
+}
+
+}`, srv.URL)
+
+	ng := engine.TestEngine{
+		ConfigJSON: content,
+	}
+	client, _ := ng.Run(t)
+
+	var reply map[string]map[string]any
+	if err := client.Call(context.Background(), utils.EeSv1ProcessEvent, &engine.CGREventWithEeIDs{
+		CGREvent: &utils.CGREvent{
+			Tenant: "cgrates.org",
+			ID:     "testNestedExport",
+			Event: map[string]any{
+				"OriginID":    "cdn_12345",
+				"Account":     "1001",
+				"Category":    "call",
+				"RequestType": "*postpaid",
+				"Usage":       120,
+				"Cost":        1.35,
+				"Extra1":      "route1",
+				"Extra2":      "route2",
+				"Tag":         "premium",
+			},
+		},
+	}, &reply); err != nil {
+		t.Fatal(err)
+	}
+
+	select {
+	case res := <-ch:
+		if res.err != nil {
+			t.Fatalf("failed to decode HTTP body: %v", res.err)
+		}
+		want := map[string]any{
+			"OriginID": "cdn_12345",
+			"Account":  "1001",
+			"billing": map[string]any{
+				"Category":    "call",
+				"RequestType": "*postpaid",
+			},
+			"Usage":     "120",
+			"Cost":      "1.35",
+			"ExtraInfo": []any{"route1", "route2"},
+			"Tag":       []any{"premium"},
+		}
+		if diff := cmp.Diff(want, res.body); diff != "" {
+			t.Errorf("unexpected JSON body (-want +got):\n%s", diff)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("timed out waiting for HTTP export")
+	}
 }

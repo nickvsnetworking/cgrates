@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package utils
 
 import (
@@ -265,5 +251,93 @@ func TestUpdateStructWithIfaceMapErrorDefault(t *testing.T) {
 	err := UpdateStructWithIfaceMap(s, mp)
 	if err == nil || err.Error() != "cannot update unsupported struct field: (0+0i)" {
 		t.Errorf("Expected <cannot update unsupported struct field: (0+0i)> ,received: <%+v>", err)
+	}
+}
+func TestFieldByIndexIsEmpty(t *testing.T) {
+	tests := []struct {
+		name  string
+		input reflect.Value
+		index []int
+		want  bool
+	}{
+		{
+			name:  "empty tenantid",
+			input: reflect.ValueOf(TenantID{Tenant: ""}),
+			index: []int{0},
+			want:  true,
+		},
+		{
+			name:  "with tenantid not empty ",
+			input: reflect.ValueOf(TenantID{Tenant: "tenant"}),
+			index: []int{0},
+			want:  false,
+		},
+		{
+			name: "pointer not empty ",
+			input: reflect.ValueOf(struct {
+				*TenantID
+			}{
+				TenantID: &TenantID{
+					Tenant: "tenant",
+				},
+			},
+			),
+			index: []int{0, 0},
+			want:  false,
+		},
+		{
+			name: "empty pointer  ",
+			input: reflect.ValueOf(struct {
+				*TenantID
+			}{
+				TenantID: &TenantID{
+					Tenant: "",
+				},
+			},
+			),
+			index: []int{0, 0},
+			want:  true,
+		},
+		{
+			name: "nil pointer ",
+			input: reflect.ValueOf(struct {
+				*TenantID
+			}{
+				TenantID: nil,
+			},
+			),
+			index: []int{0, 0},
+			want:  true,
+		},
+		{
+			name: "second struct nil",
+			input: reflect.ValueOf(struct {
+				*TenantID
+				*TenantAccount
+			}{
+				TenantID: &TenantID{
+					Tenant: "tenant",
+				},
+				TenantAccount: nil,
+			},
+			),
+			index: []int{1, 0},
+			want:  true,
+		},
+		{
+			name:  "Nil index",
+			input: reflect.ValueOf(TenantID{Tenant: "tst"}),
+			index: nil,
+			want:  false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := fieldByIndexIsEmpty(tt.input, tt.index)
+
+			if got != tt.want {
+				t.Errorf("fieldByIndexIsEmpty() = %v, want %v", got, tt.want)
+			}
+		})
 	}
 }

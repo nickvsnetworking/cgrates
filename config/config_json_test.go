@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package config
 
 import (
@@ -314,6 +300,7 @@ func TestDfDataDbJsonCfg(t *testing.T) {
 			InternalDBDumpInterval:    utils.StringPointer("0s"),
 			InternalDBRewriteInterval: utils.StringPointer("0s"),
 			InternalDBFileSizeLimit:   utils.StringPointer("1GB"),
+			RedisBatchSize:            utils.IntPointer(1000),
 			RedisMaxConns:             utils.IntPointer(10),
 			RedisConnectAttempts:      utils.IntPointer(20),
 			RedisSentinel:             utils.StringPointer(utils.EmptyString),
@@ -323,8 +310,6 @@ func TestDfDataDbJsonCfg(t *testing.T) {
 			RedisPoolPipelineWindow:   utils.StringPointer("150µs"),
 			RedisPoolPipelineLimit:    utils.IntPointer(0),
 			RedisConnectTimeout:       utils.StringPointer("0"),
-			RedisReadTimeout:          utils.StringPointer("0"),
-			RedisWriteTimeout:         utils.StringPointer("0"),
 			MongoQueryTimeout:         utils.StringPointer("10s"),
 			MongoConnScheme:           utils.StringPointer("mongodb"),
 			RedisTLS:                  utils.BoolPointer(false),
@@ -941,6 +926,7 @@ func TestDfCdrsJsonCfg(t *testing.T) {
 func TestSmgJsonCfg(t *testing.T) {
 	eCfg := &SessionSJsonCfg{
 		Enabled:                utils.BoolPointer(false),
+		ApierSConns:            &[]string{},
 		ChargerSConns:          &[]string{},
 		RALsConns:              &[]string{},
 		CDRsConns:              &[]string{},
@@ -957,6 +943,7 @@ func TestSmgJsonCfg(t *testing.T) {
 		SessionIndexes:         &[]string{},
 		ClientProtocol:         utils.Float64Pointer(2.0),
 		ChannelSyncInterval:    utils.StringPointer("0"),
+		ChannelSyncTimeout:     utils.StringPointer("60s"),
 		StaleChanMaxExtraUsage: utils.StringPointer("0"),
 		TerminateAttempts:      utils.IntPointer(5),
 		AlterableFields:        &[]string{},
@@ -1086,22 +1073,26 @@ func TestDiameterAgentJsonCfg(t *testing.T) {
 				Address: utils.StringPointer("127.0.0.1:3868"),
 				Network: utils.StringPointer(utils.TCP),
 			}},
-		DictionariesPath:        utils.StringPointer("/usr/share/cgrates/diameter/dict/"),
-		SessionSConns:           &[]string{rpcclient.BiRPCInternal},
-		StatSConns:              &[]string{},
-		ThresholdSConns:         &[]string{},
-		StatQueueIDs:            &[]string{},
-		ThresholdIDs:            &[]string{},
-		OriginHost:              utils.StringPointer("CGR-DA"),
-		OriginRealm:             utils.StringPointer("cgrates.org"),
-		VendorID:                utils.IntPointer(0),
-		ProductName:             utils.StringPointer("CGRateS"),
-		SyncedConnRequests:      utils.BoolPointer(false),
-		ASRTemplate:             utils.StringPointer(""),
-		RARTemplate:             utils.StringPointer(""),
-		ForcedDisconnect:        utils.StringPointer(utils.MetaNone),
-		ConnHealthCheckInterval: utils.StringPointer("0"),
-		RequestProcessors:       &[]*ReqProcessorJsnCfg{},
+		DictionariesPath:           utils.StringPointer("/usr/share/cgrates/diameter/dict/"),
+		DictionariesAppendDefaults: utils.BoolPointer(true),
+		SessionSConns:              &[]string{rpcclient.BiRPCInternal},
+		StatSConns:                 &[]string{},
+		ThresholdSConns:            &[]string{},
+		StatQueueIDs:               &[]string{},
+		ThresholdIDs:               &[]string{},
+		OriginHost:                 utils.StringPointer("CGR-DA"),
+		OriginRealm:                utils.StringPointer("cgrates.org"),
+		VendorID:                   utils.IntPointer(0),
+		ProductName:                utils.StringPointer("CGRateS"),
+		SyncedConnRequests:         utils.BoolPointer(false),
+		ASRTemplate:                utils.StringPointer(""),
+		RARTemplate:                utils.StringPointer(""),
+		SNRTemplate:                utils.StringPointer(""),
+		SLRTemplate:                utils.StringPointer(""),
+		STRTemplate:                utils.StringPointer(""),
+		ForcedDisconnect:           utils.StringPointer(utils.MetaNone),
+		ConnHealthCheckInterval:    utils.StringPointer("0"),
+		RequestProcessors:          &[]*ReqProcessorJsnCfg{},
 	}
 	dfCgrJSONCfg, err := NewCgrJsonCfgFromBytes([]byte(CGRATES_CFG_JSON))
 	if err != nil {
@@ -1552,8 +1543,6 @@ func TestDfMigratorCfg(t *testing.T) {
 			RedisPoolPipelineWindow: utils.StringPointer("150µs"),
 			RedisPoolPipelineLimit:  utils.IntPointer(0),
 			RedisConnectTimeout:     utils.StringPointer("0"),
-			RedisReadTimeout:        utils.StringPointer("0"),
-			RedisWriteTimeout:       utils.StringPointer("0"),
 			RedisTLS:                utils.BoolPointer(false),
 			RedisClientCertificate:  utils.StringPointer(utils.EmptyString),
 			RedisClientKey:          utils.StringPointer(utils.EmptyString),
@@ -1681,7 +1670,6 @@ func TestDfEventReaderCfg(t *testing.T) {
 				Partial_commit_fields:  &[]*FcTemplateJsonCfg{},
 				Reconnects:             utils.IntPointer(-1),
 				Max_reconnect_interval: utils.StringPointer("5m"),
-				Ees_ids:                &[]string{},
 				Ees_success_ids:        &[]string{},
 				Ees_failed_ids:         &[]string{},
 				Opts: &EventReaderOptsJson{
@@ -1866,6 +1854,136 @@ func TestDfTemplateSJsonCfg(t *testing.T) {
 				Type:      utils.StringPointer(utils.MetaVariable),
 				Value:     utils.StringPointer("~*req.CC-Request-Number"),
 				Mandatory: utils.BoolPointer(true)},
+		},
+		utils.MetaSLR: {
+			{
+				Tag:       utils.StringPointer("OriginID"),
+				Path:      utils.StringPointer(fmt.Sprintf("%s.OriginID", utils.MetaCgreq)),
+				Type:      utils.StringPointer(utils.MetaVariable),
+				Value:     utils.StringPointer("~*req.Session-Id"),
+				Mandatory: utils.BoolPointer(true)},
+			{
+				Tag:       utils.StringPointer("OriginHost"),
+				Path:      utils.StringPointer(fmt.Sprintf("%s.OriginHost", utils.MetaCgreq)),
+				Type:      utils.StringPointer(utils.MetaVariable),
+				Value:     utils.StringPointer("~*req.Origin-Host"),
+				Mandatory: utils.BoolPointer(true)},
+			{
+				Tag:       utils.StringPointer("OriginRealm"),
+				Path:      utils.StringPointer(fmt.Sprintf("%s.OriginRealm", utils.MetaCgreq)),
+				Type:      utils.StringPointer(utils.MetaVariable),
+				Value:     utils.StringPointer("~*req.Origin-Realm"),
+				Mandatory: utils.BoolPointer(true)},
+			{
+				Tag:   utils.StringPointer("Account"),
+				Path:  utils.StringPointer(fmt.Sprintf("%s.Account", utils.MetaCgreq)),
+				Type:  utils.StringPointer(utils.MetaVariable),
+				Value: utils.StringPointer("~*req.Subscription-Id.Subscription-Id-Data[~Subscription-Id-Type(0)]"),
+			},
+			{
+				Tag:   utils.StringPointer("RequestType"),
+				Path:  utils.StringPointer(fmt.Sprintf("%s.RequestType", utils.MetaCgreq)),
+				Type:  utils.StringPointer(utils.MetaConstant),
+				Value: utils.StringPointer(utils.MetaSy),
+			},
+			{
+				Tag:       utils.StringPointer("BalanceIDPolicyFilter"),
+				Path:      utils.StringPointer("*opts.*syPolicyFilters"),
+				Type:      utils.StringPointer(utils.MetaGroup),
+				Value:     utils.StringPointer("*string:~*asm.BalanceSummaries.*default.ID:balance_data"),
+				Mandatory: utils.BoolPointer(true),
+			},
+			{
+				Tag:       utils.StringPointer("BalanceIDPolicyFilter2"),
+				Path:      utils.StringPointer("*opts.*syPolicyFilters"),
+				Type:      utils.StringPointer(utils.MetaGroup),
+				Value:     utils.StringPointer("*lte:~*asm.BalanceSummaries.balance_data.Value:0"),
+				Mandatory: utils.BoolPointer(true)},
+		},
+		utils.MetaSNR: {
+			{
+				Tag:       utils.StringPointer("SessionId"),
+				Path:      utils.StringPointer(fmt.Sprintf("%s.Session-Id", utils.MetaDiamreq)),
+				Type:      utils.StringPointer(utils.MetaVariable),
+				Value:     utils.StringPointer("~*req.Session-Id"),
+				Mandatory: utils.BoolPointer(true)},
+			{
+				Tag:       utils.StringPointer("OriginHost"),
+				Path:      utils.StringPointer(fmt.Sprintf("%s.Origin-Host", utils.MetaDiamreq)),
+				Type:      utils.StringPointer(utils.MetaVariable),
+				Value:     utils.StringPointer("~*req.Origin-Host"),
+				Mandatory: utils.BoolPointer(true)},
+			{
+				Tag:       utils.StringPointer("OriginRealm"),
+				Path:      utils.StringPointer(fmt.Sprintf("%s.Origin-Realm", utils.MetaDiamreq)),
+				Type:      utils.StringPointer(utils.MetaVariable),
+				Value:     utils.StringPointer("~*req.Origin-Realm"),
+				Mandatory: utils.BoolPointer(true)},
+			{
+				Tag:       utils.StringPointer("DestinationRealm"),
+				Path:      utils.StringPointer(fmt.Sprintf("%s.Destination-Realm", utils.MetaDiamreq)),
+				Type:      utils.StringPointer(utils.MetaVariable),
+				Value:     utils.StringPointer("~*req.Destination-Realm"),
+				Mandatory: utils.BoolPointer(true)},
+			{
+				Tag:       utils.StringPointer("DestinationHost"),
+				Path:      utils.StringPointer(fmt.Sprintf("%s.Destination-Host", utils.MetaDiamreq)),
+				Type:      utils.StringPointer(utils.MetaVariable),
+				Value:     utils.StringPointer("~*req.Destination-Host"),
+				Mandatory: utils.BoolPointer(true)},
+			{
+				Tag:       utils.StringPointer("AuthApplicationId"),
+				Path:      utils.StringPointer(fmt.Sprintf("%s.Auth-Application-Id", utils.MetaDiamreq)),
+				Type:      utils.StringPointer(utils.MetaVariable),
+				Value:     utils.StringPointer("~*vars.*appid"),
+				Mandatory: utils.BoolPointer(true)},
+			{
+				Tag:        utils.StringPointer("Policy-Counter-Identifier"),
+				Path:       utils.StringPointer(fmt.Sprintf("%s.Policy-Counter-Status-Report.Policy-Counter-Identifier", utils.MetaDiamreq)),
+				Type:       utils.StringPointer(utils.MetaGroup),
+				Value:      utils.StringPointer("Monthly"),
+				New_branch: utils.BoolPointer(true)},
+			{
+				Tag:   utils.StringPointer("Policy-Counter-Status"),
+				Path:  utils.StringPointer(fmt.Sprintf("%s.Policy-Counter-Status-Report.Policy-Counter-Status", utils.MetaDiamreq)),
+				Type:  utils.StringPointer(utils.MetaGroup),
+				Value: utils.StringPointer("512KBPS")},
+			{
+				Tag:   utils.StringPointer("Pending-Policy-Counter-Information-Status"),
+				Path:  utils.StringPointer(fmt.Sprintf("%s.Policy-Counter-Status-Report.Pending-Policy-Counter-Information.Policy-Counter-Status", utils.MetaDiamreq)),
+				Type:  utils.StringPointer(utils.MetaGroup),
+				Value: utils.StringPointer("30GB")},
+			{
+				Tag:   utils.StringPointer("Pending-Policy-Counter-Information-Status-Change-Time"),
+				Path:  utils.StringPointer(fmt.Sprintf("%s.Policy-Counter-Status-Report.Pending-Policy-Counter-Information.Pending-Policy-Counter-Change-Time", utils.MetaDiamreq)),
+				Type:  utils.StringPointer(utils.MetaDateTime),
+				Value: utils.StringPointer("*now")},
+		},
+		utils.MetaSTR: {
+			{
+				Tag:       utils.StringPointer("OriginID"),
+				Path:      utils.StringPointer(fmt.Sprintf("%s.OriginID", utils.MetaCgreq)),
+				Type:      utils.StringPointer(utils.MetaVariable),
+				Value:     utils.StringPointer("~*req.Session-Id"),
+				Mandatory: utils.BoolPointer(true)},
+			{
+				Tag:       utils.StringPointer("OriginHost"),
+				Path:      utils.StringPointer(fmt.Sprintf("%s.OriginHost", utils.MetaCgreq)),
+				Type:      utils.StringPointer(utils.MetaVariable),
+				Value:     utils.StringPointer("~*req.Origin-Host"),
+				Mandatory: utils.BoolPointer(true)},
+			{
+				Tag:       utils.StringPointer("OriginRealm"),
+				Path:      utils.StringPointer(fmt.Sprintf("%s.OriginRealm", utils.MetaCgreq)),
+				Type:      utils.StringPointer(utils.MetaVariable),
+				Value:     utils.StringPointer("~*req.Origin-Realm"),
+				Mandatory: utils.BoolPointer(true)},
+			{
+				Tag:   utils.StringPointer("RequestType"),
+				Path:  utils.StringPointer(fmt.Sprintf("%s.RequestType", utils.MetaCgreq)),
+				Type:  utils.StringPointer(utils.MetaConstant),
+				Value: utils.StringPointer(utils.MetaSy),
+			},
 		},
 		utils.MetaASR: {
 			{

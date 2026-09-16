@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package engine
 
 import (
@@ -2548,7 +2534,6 @@ func TestSortedRoutesRouteIDs(t *testing.T) {
 }
 
 func TestSortedRoutesRoutesWithParams(t *testing.T) {
-	const InInFieldSep = "|"
 	sRoutes := &SortedRoutes{
 		ProfileID: "profile1",
 		Sorting:   "cost",
@@ -2560,11 +2545,11 @@ func TestSortedRoutesRoutesWithParams(t *testing.T) {
 	}
 	routesWithParams := sRoutes.RoutesWithParams()
 	expectedRoutes := []string{
-		"route1" + InInFieldSep + "params1",
+		"route1" + utils.InInFieldSep + "params1",
 		"route2",
-		"route3" + InInFieldSep + "params3",
+		"route3" + utils.InInFieldSep + "params3",
 	}
-	if reflect.DeepEqual(routesWithParams, expectedRoutes) {
+	if !reflect.DeepEqual(routesWithParams, expectedRoutes) {
 		t.Errorf("Expected %v, but got %v", expectedRoutes, routesWithParams)
 	}
 }
@@ -2751,5 +2736,152 @@ func TestSortedRoutesSortHighestCost(t *testing.T) {
 		if sRoutes.Routes[i].RouteID != routeID {
 			t.Errorf("SortHighestCost() = %v; want %v", sRoutes.Routes[i].RouteID, routeID)
 		}
+	}
+}
+
+func TestRouteClone(t *testing.T) {
+	tests := []struct {
+		name  string
+		route *Route
+	}{
+		{
+			name: "Complete Route",
+			route: &Route{
+				ID:              "id",
+				Weight:          21.1,
+				RouteParameters: "params",
+				AccountIDs:      []string{"acc1", "acc2", "acc3"},
+				RatingPlanIDs:   []string{"rpid"},
+				StatIDs:         []string{"stat"},
+				ResourceIDs:     []string{"res1", "res2", "res3"},
+				FilterIDs:       []string{"FLTR_ACNT"},
+				Blocker:         true,
+				lazyCheckRules: []*FilterRule{
+					{
+						Element: "~*req.Account",
+						Type:    utils.MetaString,
+						Values:  []string{"1001", "1002"},
+					},
+				},
+			},
+		},
+		{
+			name: "Nil fields",
+			route: &Route{
+				ID:              "id",
+				Weight:          21.1,
+				RouteParameters: "params",
+				AccountIDs:      nil,
+				RatingPlanIDs:   nil,
+				StatIDs:         nil,
+				ResourceIDs:     nil,
+				FilterIDs:       nil,
+				Blocker:         true,
+				lazyCheckRules:  nil,
+			},
+		},
+		{
+			name:  "Nil Route",
+			route: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.route.Clone()
+			if !reflect.DeepEqual(result, tt.route) {
+				t.Errorf("Clone() = %v, want %v", result, tt.route)
+			}
+
+			if result != nil && result == tt.route {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+	}
+}
+
+func TestRouteProfileClone(t *testing.T) {
+	tests := []struct {
+		name         string
+		routeProfile *RouteProfile
+	}{
+		{
+			name: "Complete RouteProfile",
+			routeProfile: &RouteProfile{
+				Tenant:    "cgrates.org",
+				ID:        "RTP_ACNT_1001",
+				FilterIDs: []string{"*string:~*req.Account:1001", "*string:~*req.Account:1002"},
+				ActivationInterval: &utils.ActivationInterval{
+					ActivationTime: time.Date(2014, 7, 29, 15, 0, 0, 0, time.UTC),
+				},
+				SortingParameters: []string{"*acd", "*tcc"},
+				Routes: []*Route{
+					{
+						ID:              "route1",
+						FilterIDs:       []string{"*string:~*req.Account:1001", "*string:~*req.Account:1002"},
+						AccountIDs:      []string{"1001", "1002"},
+						RatingPlanIDs:   []string{"RP1", "RP2"},
+						ResourceIDs:     []string{"RS1", "RS2"},
+						StatIDs:         []string{"Stat_1", "Stat_1_1"},
+						Weight:          10,
+						Blocker:         true,
+						RouteParameters: "param",
+					},
+				},
+				Sorting: utils.MetaWeight,
+				Weight:  10,
+			},
+		},
+		{
+			name: "Nil Routes",
+			routeProfile: &RouteProfile{
+				Tenant:             "",
+				ID:                 "",
+				FilterIDs:          []string{"*string:~*req.Accout:1001"},
+				ActivationInterval: &utils.ActivationInterval{},
+				SortingParameters:  []string{""},
+				Routes:             nil,
+			},
+		},
+		{
+			name: "With nil fields",
+			routeProfile: &RouteProfile{
+				Tenant:             "cgrates.org",
+				ID:                 "RTP_ACNT_1001",
+				FilterIDs:          nil,
+				ActivationInterval: nil,
+				SortingParameters:  nil,
+				Routes: []*Route{
+					{
+						ID:              "route1",
+						FilterIDs:       nil,
+						AccountIDs:      nil,
+						RatingPlanIDs:   nil,
+						ResourceIDs:     nil,
+						StatIDs:         nil,
+						Weight:          0,
+						Blocker:         false,
+						RouteParameters: "",
+					},
+				},
+				Sorting: "",
+				Weight:  0,
+			},
+		},
+		{
+			name:         "Nil RouteProfile",
+			routeProfile: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.routeProfile.Clone()
+			if !reflect.DeepEqual(result, tt.routeProfile) {
+				t.Errorf("Clone() = %v, want %v", result, tt.routeProfile)
+			}
+
+			if result != nil && result == tt.routeProfile {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
 	}
 }

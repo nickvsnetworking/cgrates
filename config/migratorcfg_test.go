@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package config
 
 import (
@@ -73,8 +59,6 @@ func TestMigratorCgrCfgloadFromJsonCfg(t *testing.T) {
 			RedisClusterOndownDelay: 0,
 			RedisPoolPipelineWindow: 5 * time.Microsecond,
 			RedisConnectTimeout:     0,
-			RedisReadTimeout:        0,
-			RedisWriteTimeout:       0,
 			RedisTLS:                false,
 		},
 		OutStorDBOpts: &StorDBOpts{
@@ -104,8 +88,6 @@ func TestMigratorCgrCfgAsMapInterface(t *testing.T) {
 		   "redisClusterSync": "2s",					
 		   "redisClusterOndownDelay": "1",
 		   "redisPoolPipelineWindow": "150µs",
-		   "redisReadTimeout": "3s",
-		   "redisWriteTimeout": "3s",	
 		   "redisMaxConns": 5,
 		   "redisConnectAttempts": 15,
 		},
@@ -156,8 +138,6 @@ func TestMigratorCgrCfgAsMapInterface(t *testing.T) {
 			utils.RedisPoolPipelineWindowCfg: "150µs",
 			utils.RedisPoolPipelineLimitCfg:  0,
 			utils.RedisConnectTimeoutCfg:     "0s",
-			utils.RedisReadTimeoutCfg:        "3s",
-			utils.RedisWriteTimeoutCfg:       "3s",
 			utils.RedisTLS:                   false,
 			utils.RedisClientCertificate:     "",
 			utils.RedisClientKey:             "",
@@ -220,8 +200,6 @@ func TestMigratorCgrCfgAsMapInterface1(t *testing.T) {
 			utils.RedisPoolPipelineWindowCfg: "1ms",
 			utils.RedisPoolPipelineLimitCfg:  3,
 			utils.RedisConnectTimeoutCfg:     "5s",
-			utils.RedisReadTimeoutCfg:        "0s",
-			utils.RedisWriteTimeoutCfg:       "0s",
 			utils.RedisTLS:                   false,
 			utils.RedisClientCertificate:     "",
 			utils.RedisClientKey:             "",
@@ -276,8 +254,6 @@ func TestMigratorCgrCfgAsMapInterface2(t *testing.T) {
 			utils.RedisPoolPipelineWindowCfg: "150µs",
 			utils.RedisPoolPipelineLimitCfg:  0,
 			utils.RedisConnectTimeoutCfg:     "0s",
-			utils.RedisReadTimeoutCfg:        "0s",
-			utils.RedisWriteTimeoutCfg:       "0s",
 			utils.RedisTLS:                   false,
 			utils.RedisClientCertificate:     "",
 			utils.RedisClientKey:             "",
@@ -317,8 +293,6 @@ func TestMigratorCgrCfgClone(t *testing.T) {
 			RedisClusterOndownDelay: 0,
 			RedisPoolPipelineWindow: 150 * time.Microsecond,
 			RedisConnectTimeout:     0,
-			RedisReadTimeout:        0,
-			RedisWriteTimeout:       0,
 			MongoQueryTimeout:       10 * time.Second,
 			RedisTLS:                false,
 		},
@@ -336,5 +310,11 @@ func TestMigratorCgrCfgClone(t *testing.T) {
 	}
 	if rcv.OutStorDBOpts.PgSSLMode = "1"; sa.OutStorDBOpts.PgSSLMode != "" {
 		t.Errorf("Expected clone to not modify the cloned")
+	}
+
+	sa = nil
+	rcv = sa.Clone()
+	if !reflect.DeepEqual(sa, rcv) {
+		t.Errorf("Expected: %+v\nReceived: %+v", utils.ToJSON(sa), utils.ToJSON(rcv))
 	}
 }

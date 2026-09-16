@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package engine
 
 import (
@@ -304,8 +290,8 @@ func TestFieldAsStringForCostDetails(t *testing.T) {
 		ToR:         "*data",
 		Cost:        0,
 		AccountSummary: &AccountSummary{
-			Tenant: "cgrates.org",
-			ID:     "AccountFromAccountSummary",
+			Tenant:    "cgrates.org",
+			AccountID: "AccountFromAccountSummary",
 			BalanceSummaries: []*BalanceSummary{
 				{
 					UUID:  "f9be602747f4",
@@ -353,7 +339,7 @@ func TestFieldAsStringForCostDetails(t *testing.T) {
 		t.Errorf("field: <%v>, expected: <%v>, received: <%v>", prsr, eFldVal, fldVal)
 	}
 
-	prsr = config.NewRSRParserMustCompile("~*req.CostDetails.AccountSummary.ID")
+	prsr = config.NewRSRParserMustCompile("~*req.CostDetails.AccountSummary.AccountID")
 	eFldVal = "AccountFromAccountSummary"
 	if fldVal, err := cdr.FieldAsString(prsr); err != nil {
 		t.Error(err)
@@ -973,8 +959,8 @@ func TestCompressedCDR(t *testing.T) {
 				},
 			},
 			AccountSummary: &AccountSummary{
-				Tenant: "cgrates.org",
-				ID:     "1001",
+				Tenant:    "cgrates.org",
+				AccountID: "1001",
 				BalanceSummaries: []*BalanceSummary{
 					{
 						UUID:  "uuid1",

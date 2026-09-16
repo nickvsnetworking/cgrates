@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package agents
 
@@ -33,6 +18,7 @@ import (
 	"github.com/cgrates/go-diameter/diam"
 	"github.com/cgrates/go-diameter/diam/avp"
 	"github.com/cgrates/go-diameter/diam/datatype"
+	"github.com/cgrates/go-diameter/diam/dict"
 )
 
 func TestLibDiamDPFieldAsInterface(t *testing.T) {
@@ -878,8 +864,15 @@ func TestLibDiamAVPAsIface(t *testing.T) {
 			diam.NewAVP(435, avp.Mbit, 0, datatype.UTF8String("http://172.10.88.88/")), // 435 code for Redirect-Server-Address
 		},
 	})
-	if rply, err := diamAVPAsIface(args); err == nil {
-		t.Errorf("Expected err received: err: %v, rply %v", err, rply)
+	exp = &diam.GroupedAVP{
+		AVP: []*diam.AVP{
+			diam.NewAVP(435, avp.Mbit, 0, datatype.UTF8String("http://172.10.88.88/")),
+		},
+	}
+	if rply, err := diamAVPAsIface(args); err != nil {
+		t.Error(err)
+	} else if !reflect.DeepEqual(exp, rply) {
+		t.Errorf("Expected<%T>: %v ,received<%T>: %v ", exp, exp, rply, rply)
 	}
 
 	args = diam.NewAVP(257, avp.Mbit, 0, datatype.Address("10.170.248.140"))
@@ -1363,7 +1356,7 @@ func TestLibDiamLoadDictionaries(t *testing.T) {
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := loadDictionaries(tc.dictsDir, "testComponent")
+			err := loadDictionaries(dict.Default, tc.dictsDir, "testComponent")
 			if tc.expectedErrorMsg == "" && err != nil {
 				t.Errorf("Unexpected error: %v", err)
 			}

@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package sessions
 
@@ -83,39 +68,6 @@ func TestIsIndexed(t *testing.T) {
 	}
 	if sS.isIndexed(&Session{CGRID: "test"}, false) {
 		t.Error("Expecting: false, received: true")
-	}
-}
-
-func TestOnBiJSONConnectDisconnect(t *testing.T) {
-	cfg := config.NewDefaultCGRConfig()
-	data, err := engine.NewInternalDB(nil, nil, true, nil, cfg.DataDbCfg().Items)
-	if err != nil {
-		t.Error(err)
-	}
-	dm := engine.NewDataManager(data, cfg.CacheCfg(), nil)
-	sessions := NewSessionS(cfg, dm, nil)
-
-	//connect BiJSON
-	client := &birpc.Service{}
-	sessions.OnBiJSONConnect(client)
-
-	//we'll change the connection identifier just for testing
-	sessions.biJClnts[client] = "test_conn"
-	sessions.biJIDs = nil
-
-	expected := NewSessionS(cfg, dm, nil)
-	expected.biJClnts[client] = "test_conn"
-	expected.biJIDs = nil
-
-	if !reflect.DeepEqual(sessions, expected) {
-		t.Errorf("Expected %+v \n, received %+v", expected, sessions)
-	}
-
-	//Disconnect BiJSON
-	sessions.OnBiJSONDisconnect(client)
-	delete(expected.biJClnts, client)
-	if !reflect.DeepEqual(sessions, expected) {
-		t.Errorf("Expected %+v \n, received %+v", expected, sessions)
 	}
 }
 
@@ -1989,8 +1941,7 @@ func TestNewSessionS(t *testing.T) {
 	eOut := &SessionS{
 		cgrCfg:         cgrCGF,
 		dm:             nil,
-		biJClnts:       make(map[birpc.ClientConnector]string),
-		biJIDs:         make(map[string]*biJClient),
+		sBiRPCClients:  utils.NewServiceBiRPCClients(),
 		aSessions:      make(map[string]*Session),
 		aSessionsIdx:   make(map[string]map[string]map[string]utils.StringSet),
 		aSessionsRIdx:  make(map[string][]*riFieldNameVal),
@@ -2636,7 +2587,7 @@ func TestWarnSession(t *testing.T) {
 	sessions := NewSessionS(cfg, dm, nil)
 
 	sTestMock := &mockConnWarnDisconnect1{}
-	sessions.RegisterIntBiJConn(sTestMock, utils.EmptyString)
+	sessions.sBiRPCClients.RegisterIntBiJConn(sTestMock, "ClientConnIdtest", 0)
 
 	if err := sessions.warnSession("ClientConnIdtest", nil); err != nil {
 		t.Error(err)
@@ -2645,7 +2596,7 @@ func TestWarnSession(t *testing.T) {
 	cfg.GeneralCfg().NodeID = "ClientConnIdtest2"
 	sessions = NewSessionS(cfg, dm, nil)
 	sTestMock2 := &mockConnWarnDisconnect2{}
-	sessions.RegisterIntBiJConn(sTestMock2, utils.EmptyString)
+	sessions.sBiRPCClients.RegisterIntBiJConn(sTestMock2, "ClientConnIdtest2", 0)
 	if err := sessions.warnSession("ClientConnIdtest2", nil); err == nil || err != utils.ErrNoActiveSession {
 		t.Errorf("Expected %+v, received %+v", utils.ErrNoActiveSession, err)
 	}
@@ -2720,24 +2671,6 @@ func TestInitSession(t *testing.T) {
 	s.SRuns = nil
 	if !reflect.DeepEqual(exp, s) {
 		t.Errorf("Expected %v , received: %s", utils.ToJSON(exp), utils.ToJSON(s))
-	}
-}
-
-func TestBiJClntID(t *testing.T) {
-	client := &mockConnWarnDisconnect1{}
-	cfg := config.NewDefaultCGRConfig()
-	data, err := engine.NewInternalDB(nil, nil, true, nil, cfg.DataDbCfg().Items)
-	if err != nil {
-		t.Error(err)
-	}
-	dm := engine.NewDataManager(data, cfg.CacheCfg(), nil)
-	sessions := NewSessionS(cfg, dm, nil)
-	sessions.biJClnts = map[birpc.ClientConnector]string{
-		client: "First_connector",
-	}
-	expected := "First_connector"
-	if rcv := sessions.biJClntID(client); !reflect.DeepEqual(expected, rcv) {
-		t.Errorf("Expected %+v, received %+v", expected, rcv)
 	}
 }
 

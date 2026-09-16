@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package engine
 
@@ -177,12 +162,63 @@ func TestLibIndexRemoveFilterIndexesForFilter(t *testing.T) {
 	}
 }
 
-func TestLibIndexSplitFilterIndexErrWrongIdxKeyFormat(t *testing.T) {
-	tntCtxIdxKey := "invalid:key"
-	expectedErr := "WRONG_IDX_KEY_FORMAT<invalid:key>"
-	_, _, err := splitFilterIndex(tntCtxIdxKey)
-	if err == nil || err.Error() != expectedErr {
-		t.Fatalf("Expected error %v, got %v", expectedErr, err)
+func TestLibIndexSplitFilterIndex(t *testing.T) {
+	tests := []struct {
+		name    string
+		input   string
+		tntCtx  string
+		idxKey  string
+		wantErr bool
+	}{
+		{
+			name:   "string",
+			input:  "cgrates.org:*string:*req.Account:1001",
+			tntCtx: "cgrates.org",
+			idxKey: "*string:*req.Account:1001",
+		},
+		{
+			name:   "exists",
+			input:  "cgrates.org:*exists:*req.Account",
+			tntCtx: "cgrates.org",
+			idxKey: "*exists:*req.Account",
+		},
+		{
+			name:   "tenant with context",
+			input:  "cgrates.org:ctx:*string:*req.X:val",
+			tntCtx: "cgrates.org:ctx",
+			idxKey: "*string:*req.X:val",
+		},
+		{
+			name:   "none",
+			input:  "cgrates.org:*none:*any:*any",
+			tntCtx: "cgrates.org",
+			idxKey: "*none:*any:*any",
+		},
+		{
+			name:    "no filter type",
+			input:   "invalid:key",
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tntCtx, idxKey, err := splitFilterIndex(tt.input)
+			if tt.wantErr {
+				if err == nil {
+					t.Fatalf("expected error, got tntCtx=%q idxKey=%q", tntCtx, idxKey)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if tntCtx != tt.tntCtx {
+				t.Errorf("tntCtx = %q, want %q", tntCtx, tt.tntCtx)
+			}
+			if idxKey != tt.idxKey {
+				t.Errorf("idxKey = %q, want %q", idxKey, tt.idxKey)
+			}
+		})
 	}
 }
 

@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package engine
 
@@ -81,7 +66,9 @@ func (eeR *ExportRequest) FieldAsInterface(fldPath []string) (val any, err error
 	if err != nil {
 		return
 	}
-	if nmItems, isNMItems := val.(*utils.DataNode); isNMItems && nmItems.Type == utils.NMSliceType { // special handling of NMItems, take the last value out of it
+	// TODO: this assertion is unreachable; FieldAsInterface never returns *DataNode
+	if nmItems, isNMItems := val.(*utils.DataNode); isNMItems &&
+		nmItems.Type == utils.NMSliceType { // special handling of NMItems, take the last value out of it
 		el := nmItems.Slice[len(nmItems.Slice)-1]
 		if el.Type == utils.NMDataType {
 			val = el.Value.Data
@@ -213,7 +200,7 @@ func (eeR *ExportRequest) Append(fullPath *utils.FullPath, val *utils.DataLeaf) 
 	case utils.MetaUCH:
 		return Cache.Set(utils.CacheUCH, fullPath.Path[5:], val.Data, nil, true, utils.NonTransactional)
 	case utils.MetaOpts:
-		return eeR.inData[utils.MetaOpts].Set(fullPath.PathSlice[1:], val.Data)
+		return eeR.inData[utils.MetaOpts].(utils.MapStorage).Append(fullPath.PathSlice[1:], val.Data)
 	default:
 		oNM, has := eeR.ExpData[prfx]
 		if !has {

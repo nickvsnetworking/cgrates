@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package v1
 
@@ -62,8 +47,19 @@ func (tSv1 *ThresholdSv1) ResetThreshold(ctx *context.Context, tntID *utils.Tena
 	return tSv1.tS.V1ResetThreshold(ctx, tntID.TenantID, reply)
 }
 
+// BiRPCv1RegisterInternalBiJSONConn will register the internal BiRPC connection towards ThresholdS
 func (tSv1 *ThresholdSv1) RegisterInternalBiJSONConn(ctx *context.Context, args string, rply *string) (err error) {
 	return tSv1.tS.BiRPCv1RegisterInternalBiJSONConn(ctx, args, rply)
+}
+
+// BiRPCv1StoreClientConnID will create a ClientConnID and store it in relation to the threshold profile ID it represents
+func (tSv1 *ThresholdSv1) StoreClientConnID(ctx *context.Context, args *utils.SyConnIDs, rply *string) (err error) {
+	return tSv1.tS.BiRPCv1StoreClientConnID(ctx, args, rply)
+}
+
+// BiRPCv1RemoveClientConnID will remove the args ClientConnID from the list of SyConnIds on the ThresholdService
+func (tSv1 *ThresholdSv1) RemoveClientConnID(ctx *context.Context, args string, rply *string) (err error) {
+	return tSv1.tS.BiRPCv1RemoveClientConnID(ctx, args, rply)
 }
 
 // GetThresholdProfile returns a Threshold Profile

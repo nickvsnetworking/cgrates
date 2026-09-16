@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package config
 
@@ -59,7 +44,10 @@ func (mailcfg *MailerCfg) AsMapInterface() (initialMP map[string]any) {
 }
 
 // Clone returns a deep copy of MailerCfg
-func (mailcfg MailerCfg) Clone() *MailerCfg {
+func (mailcfg *MailerCfg) Clone() *MailerCfg {
+	if mailcfg == nil {
+		return nil
+	}
 	return &MailerCfg{
 		MailerServer:   mailcfg.MailerServer,
 		MailerAuthUser: mailcfg.MailerAuthUser,

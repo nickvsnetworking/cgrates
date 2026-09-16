@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package config
 
@@ -389,6 +374,7 @@ type EventReaderOpts struct {
 	PartialPath        *string
 	PartialCacheAction *string
 	PartialOrderField  *string
+	IgnoreErroredItems *bool
 	XMLRootPath        *string
 	CSV                *CSVROpts
 	AMQP               *AMQPROpts
@@ -420,7 +406,6 @@ type EventReaderCfg struct {
 	Flags                utils.FlagsWithParams
 	Reconnects           int
 	MaxReconnectInterval time.Duration
-	EEsIDs               []string
 	EEsSuccessIDs        []string
 	EEsFailedIDs         []string
 	Opts                 *EventReaderOpts
@@ -459,6 +444,9 @@ func (erOpts *EventReaderOpts) loadFromJSONCfg(jsnCfg *EventReaderOptsJson) (err
 	}
 	if jsnCfg.PartialOrderField != nil {
 		erOpts.PartialOrderField = jsnCfg.PartialOrderField
+	}
+	if jsnCfg.IgnoreErroredItems != nil {
+		erOpts.IgnoreErroredItems = jsnCfg.IgnoreErroredItems
 	}
 	if jsnCfg.XMLRootPath != nil {
 		erOpts.XMLRootPath = jsnCfg.XMLRootPath
@@ -518,10 +506,6 @@ func (er *EventReaderCfg) loadFromJSONCfg(jsnCfg *EventReaderJsonCfg, msgTemplat
 		if er.MaxReconnectInterval, err = utils.ParseDurationWithNanosecs(*jsnCfg.Max_reconnect_interval); err != nil {
 			return err
 		}
-	}
-	if jsnCfg.Ees_ids != nil {
-		er.EEsIDs = make([]string, len(*jsnCfg.Ees_ids))
-		copy(er.EEsIDs, *jsnCfg.Ees_ids)
 	}
 	if jsnCfg.Ees_success_ids != nil {
 		er.EEsSuccessIDs = make([]string, len(*jsnCfg.Ees_success_ids))
@@ -756,6 +740,9 @@ func (natOpts *NATSROpts) Clone() *NATSROpts {
 }
 
 func (erOpts *EventReaderOpts) Clone() *EventReaderOpts {
+	if erOpts == nil {
+		return nil
+	}
 	cln := &EventReaderOpts{}
 	if erOpts.PartialPath != nil {
 		cln.PartialPath = new(string)
@@ -768,6 +755,10 @@ func (erOpts *EventReaderOpts) Clone() *EventReaderOpts {
 	if erOpts.PartialOrderField != nil {
 		cln.PartialOrderField = new(string)
 		*cln.PartialOrderField = *erOpts.PartialOrderField
+	}
+	if erOpts.IgnoreErroredItems != nil {
+		cln.IgnoreErroredItems = new(bool)
+		*cln.IgnoreErroredItems = *erOpts.IgnoreErroredItems
 	}
 	if erOpts.CSV != nil {
 		cln.CSV = erOpts.CSV.Clone()
@@ -796,7 +787,10 @@ func (erOpts *EventReaderOpts) Clone() *EventReaderOpts {
 }
 
 // Clone returns a deep copy of EventReaderCfg
-func (er EventReaderCfg) Clone() (cln *EventReaderCfg) {
+func (er *EventReaderCfg) Clone() (cln *EventReaderCfg) {
+	if er == nil {
+		return nil
+	}
 	cln = &EventReaderCfg{
 		ID:                   er.ID,
 		Type:                 er.Type,
@@ -811,7 +805,6 @@ func (er EventReaderCfg) Clone() (cln *EventReaderCfg) {
 		Flags:                er.Flags.Clone(),
 		Reconnects:           er.Reconnects,
 		MaxReconnectInterval: er.MaxReconnectInterval,
-		EEsIDs:               slices.Clone(er.EEsIDs),
 		EEsSuccessIDs:        slices.Clone(er.EEsSuccessIDs),
 		EEsFailedIDs:         slices.Clone(er.EEsFailedIDs),
 		Opts:                 er.Opts.Clone(),
@@ -849,6 +842,9 @@ func (er *EventReaderCfg) AsMapInterface(separator string) (initialMP map[string
 	}
 	if er.Opts.PartialOrderField != nil {
 		opts[utils.PartialOrderFieldOpt] = *er.Opts.PartialOrderField
+	}
+	if er.Opts.IgnoreErroredItems != nil {
+		opts[utils.IgnoreErroredItemsOpt] = *er.Opts.IgnoreErroredItems
 	}
 
 	if csvOpts := er.Opts.CSV; csvOpts != nil {
@@ -1009,9 +1005,6 @@ func (er *EventReaderCfg) AsMapInterface(separator string) (initialMP map[string
 		utils.OptsCfg:                 opts,
 	}
 
-	if len(er.EEsIDs) != 0 {
-		initialMP[utils.EEsIDsCfg] = er.EEsIDs
-	}
 	if len(er.EEsSuccessIDs) != 0 {
 		initialMP[utils.EEsSuccessIDsCfg] = er.EEsSuccessIDs
 	}

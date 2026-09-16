@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package config
 
 import (
@@ -23,6 +9,7 @@ import (
 	"time"
 
 	"github.com/cgrates/cgrates/utils"
+	"github.com/cgrates/ltcache"
 )
 
 func TestStoreDbCfgloadFromJsonCfgCase1(t *testing.T) {
@@ -110,6 +97,47 @@ func TestStoreDbCfgloadFromJsonCfgCase1(t *testing.T) {
 		t.Errorf("Expected %+v \n, recevied %+v", utils.ToJSON(expected.RmtConns), utils.ToJSON(jsonCfg.storDbCfg.RmtConns))
 	}
 
+	if err := jsonCfg.storDbCfg.loadFromJSONCfg(&DbJsonCfg{
+		Opts: &DBOptsJson{
+			InternalDBStartTimeout: utils.StringPointer("test"),
+		}}); err == nil {
+		t.Error(err)
+	} else if err := jsonCfg.storDbCfg.loadFromJSONCfg(&DbJsonCfg{
+		Opts: &DBOptsJson{
+			InternalDBDumpInterval: utils.StringPointer("test"),
+		}}); err == nil {
+		t.Error(err)
+	} else if err := jsonCfg.storDbCfg.loadFromJSONCfg(&DbJsonCfg{
+		Opts: &DBOptsJson{
+			InternalDBRewriteInterval: utils.StringPointer("test"),
+		}}); err == nil {
+		t.Error(err)
+	} else if err := jsonCfg.storDbCfg.loadFromJSONCfg(&DbJsonCfg{
+		Opts: &DBOptsJson{
+			InternalDBFileSizeLimit: utils.StringPointer("test"),
+		}}); err == nil {
+		t.Error(err)
+	} else if err := jsonCfg.storDbCfg.loadFromJSONCfg(&DbJsonCfg{
+		Opts: &DBOptsJson{
+			SQLConnMaxLifetime: utils.StringPointer("test"),
+		}}); err == nil {
+		t.Error(err)
+	} else if err := jsonCfg.storDbCfg.loadFromJSONCfg(&DbJsonCfg{
+		Opts: &DBOptsJson{
+			MongoQueryTimeout: utils.StringPointer("test"),
+		}}); err == nil {
+		t.Error(err)
+	} else if err := jsonCfg.storDbCfg.loadFromJSONCfg(&DbJsonCfg{
+		Items: &map[string]*ItemOptJson{
+			utils.MetaDestinations: {
+				Ttl: utils.StringPointer("1ss"),
+			},
+		},
+	}); err == nil {
+		expErr := `unknown unit "ss" in duration "1ss"`
+		t.Errorf("Expected %v, recieved %v", expErr, err)
+	}
+
 }
 
 func TestStoreDbCfgloadFromJsonCfgCase2(t *testing.T) {
@@ -139,6 +167,13 @@ func TestStoreDbCfgloadFromJsonCfgCase4(t *testing.T) {
 	clonedStoreDb := jsonCfg.storDbCfg.Clone()
 	if !reflect.DeepEqual(clonedStoreDb, jsonCfg.storDbCfg) {
 		t.Errorf("Expected %+v, received %+v", utils.ToJSON(clonedStoreDb), utils.ToJSON(jsonCfg.storDbCfg))
+	}
+}
+func TestStoreDbCfgloadFromJsonCfgCase5(t *testing.T) {
+	dbOpts := &StorDBOpts{}
+	dbOpts.loadFromJSONCfg(nil)
+	if dbOpts.SQLMaxOpenConns != 0 {
+		t.Errorf("Expected 0, but got: %v", dbOpts.SQLMaxOpenConns)
 	}
 }
 
@@ -226,7 +261,12 @@ func TestStorDbCfgAsMapInterface(t *testing.T) {
 				"mongoQueryTimeout":"10s",
 				"mongoConnScheme": "mongodb+srv",
 				"pgSSLMode":"disable",		
-				"mysqlLocation": "UTC",			
+				"mysqlLocation": "UTC",		
+				"pgSSLCert":"test",
+				"pgSSLKey":"test",
+				"pgSSLPassword":"testpass",
+				"pgSSLCertMode":"test",
+				"pgSSLRootCert":"test",
 			},
 			"items":{
 				"session_costs": {}, 
@@ -263,6 +303,11 @@ func TestStorDbCfgAsMapInterface(t *testing.T) {
 			utils.PgSSLModeCfg:                 "disable",
 			utils.MysqlLocation:                "UTC",
 			utils.PgSchema:                     "",
+			utils.PgSSLCertCfg:                 "test",
+			utils.PgSSLKeyCfg:                  "test",
+			utils.PgSSLPasswordCfg:             "testpass",
+			utils.PgSSLCertModeCfg:             "test",
+			utils.PgSSLRootCertCfg:             "test",
 		},
 		utils.ItemsCfg: map[string]any{
 			utils.SessionCostsTBL: map[string]any{utils.RemoteCfg: false, utils.ReplicateCfg: false},
@@ -290,59 +335,149 @@ func TestStorDbCfgAsMapInterface(t *testing.T) {
 }
 
 func TestStorDbCfgClone(t *testing.T) {
-	ban := &StorDbCfg{
-		Type:                utils.MetaMySQL,
-		Host:                "127.0.0.1",
-		Port:                "-1",
-		Name:                utils.CGRateSLwr,
-		User:                utils.CGRateSLwr,
-		Password:            "pass123",
-		StringIndexedFields: []string{"*req.index1"},
-		PrefixIndexedFields: []string{"*req.index1"},
-		RmtConns:            []string{"*conn1"},
-		RplConns:            []string{"*conn1"},
-		Items: map[string]*ItemOpt{
-			utils.MetaSessionsCosts: {
-				Remote:    true,
-				Replicate: true,
-			},
-			utils.MetaCDRs: {
-				Remote:    true,
-				Replicate: false,
+	tests := []struct {
+		name      string
+		storDbCfg *StorDbCfg
+	}{
+		{
+			name: "Complete StorDbCfg",
+			storDbCfg: &StorDbCfg{
+				Type:                utils.MetaMySQL,
+				Host:                "127.0.0.1",
+				Port:                "-1",
+				Name:                utils.CGRateSLwr,
+				User:                utils.CGRateSLwr,
+				Password:            "pass123",
+				StringIndexedFields: []string{"*req.index1"},
+				PrefixIndexedFields: []string{"*req.index1"},
+				RmtConns:            []string{"*conn1"},
+				RplConns:            []string{"*conn1"},
+				Items: map[string]*ItemOpt{
+					utils.MetaSessionsCosts: {
+						Remote:    true,
+						Replicate: true,
+					},
+					utils.MetaCDRs: {
+						Remote:    true,
+						Replicate: false,
+					},
+				},
+				Opts: &StorDBOpts{
+					SQLMaxOpenConns:    100,
+					SQLMaxIdleConns:    10,
+					SQLConnMaxLifetime: 0,
+					MySQLDSNParams:     make(map[string]string),
+					MySQLLocation:      "UTC",
+					PgSSLMode:          "disable",
+				},
 			},
 		},
-		Opts: &StorDBOpts{
-			SQLMaxOpenConns:    100,
-			SQLMaxIdleConns:    10,
-			SQLConnMaxLifetime: 0,
-			MySQLDSNParams:     make(map[string]string),
-			MySQLLocation:      "UTC",
-			PgSSLMode:          "disable",
+		{
+			name: "Nil Opts",
+			storDbCfg: &StorDbCfg{
+				Type:                utils.MetaMySQL,
+				Host:                "127.0.0.1",
+				Port:                "-1",
+				Name:                utils.CGRateSLwr,
+				User:                utils.CGRateSLwr,
+				Password:            "pass123",
+				StringIndexedFields: []string{"*req.index1"},
+				PrefixIndexedFields: []string{"*req.index1"},
+				RmtConns:            []string{"*conn1"},
+				RplConns:            []string{"*conn1"},
+				Items: map[string]*ItemOpt{
+					utils.MetaSessionsCosts: {
+						Remote:    true,
+						Replicate: true,
+					},
+					utils.MetaCDRs: {
+						Remote:    true,
+						Replicate: false,
+					},
+				},
+				Opts: nil,
+			},
+		},
+		{
+			name:      "Nil StorDbCfg",
+			storDbCfg: nil,
 		},
 	}
-	rcv := ban.Clone()
-	if !reflect.DeepEqual(ban, rcv) {
-		t.Errorf("Expected: %+v\nReceived: %+v", utils.ToJSON(ban), utils.ToJSON(rcv))
-	}
-	if rcv.StringIndexedFields[0] = ""; ban.StringIndexedFields[0] != "*req.index1" {
-		t.Errorf("Expected clone to not modify the cloned")
-	}
-	if rcv.PrefixIndexedFields[0] = ""; ban.PrefixIndexedFields[0] != "*req.index1" {
-		t.Errorf("Expected clone to not modify the cloned")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rcv := tt.storDbCfg.Clone()
+			if !reflect.DeepEqual(tt.storDbCfg, rcv) {
+				t.Errorf("Expected: %+v\nReceived: %+v", utils.ToJSON(tt.storDbCfg), utils.ToJSON(rcv))
+			}
+
+			if rcv != nil && tt.storDbCfg != nil {
+				if rcv.StringIndexedFields[0] = ""; tt.storDbCfg.StringIndexedFields[0] != "*req.index1" {
+					t.Errorf("Expected clone to not modify the cloned")
+				}
+				if rcv.PrefixIndexedFields[0] = ""; tt.storDbCfg.PrefixIndexedFields[0] != "*req.index1" {
+					t.Errorf("Expected clone to not modify the cloned")
+				}
+
+				if rcv.RmtConns[0] = ""; tt.storDbCfg.RmtConns[0] != "*conn1" {
+					t.Errorf("Expected clone to not modify the cloned")
+				}
+				if rcv.RplConns[0] = ""; tt.storDbCfg.RplConns[0] != "*conn1" {
+					t.Errorf("Expected clone to not modify the cloned")
+				}
+
+				if rcv.Items[utils.MetaCDRs].Remote = false; !tt.storDbCfg.Items[utils.MetaCDRs].Remote {
+					t.Errorf("Expected clone to not modify the cloned")
+				}
+				if rcv.Opts != nil {
+					if rcv.Opts.PgSSLMode = ""; tt.storDbCfg.Opts.PgSSLMode != "disable" {
+						t.Errorf("Expected clone to not modify the cloned")
+					}
+				}
+			}
+		})
 	}
 
-	if rcv.RmtConns[0] = ""; ban.RmtConns[0] != "*conn1" {
-		t.Errorf("Expected clone to not modify the cloned")
-	}
-	if rcv.RplConns[0] = ""; ban.RplConns[0] != "*conn1" {
-		t.Errorf("Expected clone to not modify the cloned")
-	}
+}
 
-	if rcv.Items[utils.MetaCDRs].Remote = false; !ban.Items[utils.MetaCDRs].Remote {
-		t.Errorf("Expected clone to not modify the cloned")
-	}
-	if rcv.Opts.PgSSLMode = ""; ban.Opts.PgSSLMode != "disable" {
-		t.Errorf("Expected clone to not modify the cloned")
-	}
+func TestStorDBOptsToTransCacheOpts(t *testing.T) {
 
+	tests := []struct {
+		name        string
+		storeDBOpts *StorDBOpts
+		want        *ltcache.TransCacheOpts
+	}{
+		{
+			name: "Complete storeDBOpts",
+			storeDBOpts: &StorDBOpts{
+				InternalDBDumpPath:        "/testPath",
+				InternalDBBackupPath:      "/test",
+				InternalDBStartTimeout:    10 * time.Second,
+				InternalDBDumpInterval:    20 * time.Second,
+				InternalDBRewriteInterval: 30 * time.Second,
+				InternalDBFileSizeLimit:   1024,
+			},
+			want: &ltcache.TransCacheOpts{
+				DumpPath:        "/testPath",
+				BackupPath:      "/test",
+				StartTimeout:    10 * time.Second,
+				DumpInterval:    20 * time.Second,
+				RewriteInterval: 30 * time.Second,
+				FileSizeLimit:   1024,
+			},
+		},
+		{
+			name:        "Nil storeDBOpts",
+			storeDBOpts: nil,
+			want:        nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.storeDBOpts.ToTransCacheOpts()
+
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("ToTransCacheOpts() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

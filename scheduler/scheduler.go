@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package scheduler
 
@@ -103,14 +88,16 @@ func (s *Scheduler) Loop() {
 		now := time.Now()
 		start := a0.GetNextStartTime(now)
 		if start.Equal(now) || start.Before(now) {
-			go a0.Execute(s.fltrS, utils.SchedulerS)
+			go a0.Execute(s.fltrS, utils.SchedulerS, nil)
 			// if after execute the next start time is in the past then
 			// do not add it to the queue
 			if strings.HasPrefix(a0.Timing.Timing.StartTime, utils.PlusChar) {
 				s.queue = s.queue[1:]
 			} else {
 				a0.ResetStartTimeCache()
-				now = time.Now().Add(time.Second)
+				if !strings.HasPrefix(a0.Timing.Timing.StartTime, utils.MetaRecurring) {
+					now = time.Now().Add(time.Second)
+				}
 				start = a0.GetNextStartTime(now)
 				if start.Before(now) {
 					s.queue = s.queue[1:]

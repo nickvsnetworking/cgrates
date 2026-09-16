@@ -1,23 +1,9 @@
 //go:build integration
 // +build integration
 
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package v1
 
 import (
@@ -310,8 +296,8 @@ func testV1CDRsRefundOutOfSessionCost(t *testing.T) {
 					},
 				},
 				AccountSummary: &engine.AccountSummary{
-					Tenant: "cgrates.org",
-					ID:     "testV1CDRsRefundOutOfSessionCost",
+					Tenant:    "cgrates.org",
+					AccountID: "testV1CDRsRefundOutOfSessionCost",
 					BalanceSummaries: []*engine.BalanceSummary{
 						{
 							UUID:  balanceUuid,
@@ -465,8 +451,8 @@ func testV1CDRsRefundCDR(t *testing.T) {
 						},
 					},
 					AccountSummary: &engine.AccountSummary{
-						Tenant: "cgrates.org",
-						ID:     "testV1CDRsRefundCDR",
+						Tenant:    "cgrates.org",
+						AccountID: "testV1CDRsRefundCDR",
 						BalanceSummaries: []*engine.BalanceSummary{
 							{
 								UUID:  balanceUuid,

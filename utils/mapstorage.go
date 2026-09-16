@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package utils
 
@@ -203,6 +188,42 @@ func (ms MapStorage) Set(fldPath []string, val any) (err error) {
 		return ErrWrongPath
 	}
 
+}
+
+// Append appends val to a []any slice at the given path.
+// If the key is missing, it creates []any{val}.
+// If the key holds a []any, it appends to it.
+// If the key holds any other value, it promotes to []any{existing, val}.
+func (ms MapStorage) Append(fldPath []string, val any) error {
+	if len(fldPath) == 0 {
+		return ErrWrongPath
+	}
+	if len(fldPath) == 1 {
+		existing, has := ms[fldPath[0]]
+		if !has {
+			ms[fldPath[0]] = []any{val}
+			return nil
+		}
+		if sl, ok := existing.([]any); ok {
+			ms[fldPath[0]] = append(sl, val)
+			return nil
+		}
+		ms[fldPath[0]] = []any{existing, val}
+		return nil
+	}
+	if _, has := ms[fldPath[0]]; !has {
+		nMap := MapStorage{}
+		ms[fldPath[0]] = nMap
+		return nMap.Append(fldPath[1:], val)
+	}
+	switch dp := ms[fldPath[0]].(type) {
+	case MapStorage:
+		return dp.Append(fldPath[1:], val)
+	case map[string]any:
+		return MapStorage(dp).Append(fldPath[1:], val)
+	default:
+		return ErrWrongPath
+	}
 }
 
 // GetKeys returns all the keys from map

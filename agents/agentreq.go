@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package agents
 
@@ -262,21 +247,21 @@ func (ar *AgentRequest) SetFields(tplFlds []*config.FCTemplate) (err error) {
 }
 
 // Set implements utils.NMInterface
-func (ar *AgentRequest) SetAsSlice(fullPath *utils.FullPath, nm *utils.DataLeaf) (err error) {
+func (ar *AgentRequest) SetAsSlice(fullPath *utils.FullPath, nm *utils.DataLeaf) error {
 	switch fullPath.PathSlice[0] {
 	default:
 		return fmt.Errorf("unsupported field prefix: <%s> when set field", fullPath.PathSlice[0])
 	case utils.MetaVars:
-		_, err = ar.Vars.Set(fullPath.PathSlice[1:], []*utils.DataNode{{Type: utils.NMDataType, Value: nm}})
-		return
+		_, err := ar.Vars.Set(fullPath.PathSlice[1:], nm)
+		return err
 	case utils.MetaCgreq:
 		return ar.CGRRequest.SetAsSlice(&utils.FullPath{
 			PathSlice: fullPath.PathSlice[1:],
 			Path:      fullPath.Path[7:],
 		}, []*utils.DataNode{{Type: utils.NMDataType, Value: nm}})
 	case utils.MetaCgrep:
-		_, err = ar.CGRReply.Set(fullPath.PathSlice[1:], []*utils.DataNode{{Type: utils.NMDataType, Value: nm}})
-		return
+		_, err := ar.CGRReply.Set(fullPath.PathSlice[1:], nm)
+		return err
 	case utils.MetaRep:
 		return ar.Reply.SetAsSlice(&utils.FullPath{
 			PathSlice: fullPath.PathSlice[1:],
@@ -293,8 +278,8 @@ func (ar *AgentRequest) SetAsSlice(fullPath *utils.FullPath, nm *utils.DataLeaf)
 			Path:      fullPath.Path[14:],
 		}, []*utils.DataNode{{Type: utils.NMDataType, Value: nm}})
 	case utils.MetaTmp:
-		_, err = ar.tmp.Set(fullPath.PathSlice[1:], []*utils.DataNode{{Type: utils.NMDataType, Value: nm}})
-		return
+		_, err := ar.tmp.Set(fullPath.PathSlice[1:], nm)
+		return err
 	case utils.MetaOpts:
 		return ar.Opts.Set(fullPath.PathSlice[1:], nm.Data)
 	case utils.MetaUCH:
@@ -447,7 +432,7 @@ func (ar *AgentRequest) Append(fullPath *utils.FullPath, val *utils.DataLeaf) (e
 		_, err = ar.tmp.Append(fullPath.PathSlice[1:], val)
 		return
 	case utils.MetaOpts:
-		return ar.Opts.Set(fullPath.PathSlice[1:], val.Data)
+		return ar.Opts.Append(fullPath.PathSlice[1:], val.Data)
 	case utils.MetaUCH:
 		return engine.Cache.Set(utils.CacheUCH, fullPath.Path[5:], val.Data, nil, true, utils.NonTransactional)
 	}

@@ -1,24 +1,11 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package config
 
 import (
 	"testing"
+	"time"
 
 	"github.com/cgrates/cgrates/utils"
 )
@@ -132,7 +119,7 @@ func TestConfigSanityCDRServer(t *testing.T) {
 	cfg.cdrsCfg.ThresholdSConns = []string{}
 
 	cfg.cdrsCfg.OnlineCDRExports = []string{"*default", "stringy"}
-	expected = "<CDRs> cannot find exporter with ID: <stringy>"
+	expected = "<CDRs> cannot find exporters with IDs: <stringy>"
 	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
 		t.Errorf("Expecting: %+q  received: %+q", expected, err)
 	}
@@ -149,6 +136,19 @@ func TestConfigSanitySessionS(t *testing.T) {
 		t.Errorf("Expecting: %+q  received: %+q", expected, err)
 	}
 	cfg.sessionSCfg.TerminateAttempts = 1
+
+	cfg.sessionSCfg.ApierSConns = []string{utils.MetaInternal}
+	expected = "<ApierS> not enabled but requested by <SessionS> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.sessionSCfg.ApierSConns = []string{"test"}
+	expected = "<SessionS> connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.sessionSCfg.ApierSConns = []string{}
+	cfg.ApierCfg().Enabled = true
 
 	cfg.sessionSCfg.ChargerSConns = []string{utils.MetaInternal}
 	expected = "<ChargerS> not enabled but requested by <SessionS> component"
@@ -393,6 +393,50 @@ func TestConfigSanityDAgent(t *testing.T) {
 	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
 		t.Errorf("Expecting: %+q  received: %+q", expected, err)
 	}
+	cfg.diameterAgentCfg.StatSConns = []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaStats)}
+	expected = "<SessionS> not enabled but requested by <DiameterAgent> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+
+	cfg.diameterAgentCfg.ThresholdSConns = []string{utils.ConcatenatedKey(utils.MetaInternal, utils.MetaThresholds)}
+	expected = "<SessionS> not enabled but requested by <DiameterAgent> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+
+	cfg.sessionSCfg.Enabled = true
+	cfg.diameterAgentCfg.StatSConns = []string{"test"}
+	expected = "<DiameterAgent> connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.diameterAgentCfg.StatSConns = []string{}
+
+	cfg.diameterAgentCfg.ThresholdSConns = []string{"test"}
+	expected = "<DiameterAgent> connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.diameterAgentCfg.ThresholdSConns = []string{}
+	cfg.sessionSCfg.Enabled = false
+
+	cfg.diameterAgentCfg.ConnStatusStatQueueIDs = []string{"1", "2"}
+	cfg.diameterAgentCfg.StatSConns = []string{}
+	expected = `<DiameterAgent> stat_queue_ids defined but no Stats connections configured`
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.diameterAgentCfg.ConnStatusStatQueueIDs = []string{}
+
+	cfg.diameterAgentCfg.ConnStatusThresholdIDs = []string{"1", "2"}
+	cfg.diameterAgentCfg.ThresholdSConns = []string{}
+	expected = "<DiameterAgent> threshold_ids defined but no ThresholdS connections configured"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.diameterAgentCfg.ConnStatusThresholdIDs = []string{}
+
 	cfg.diameterAgentCfg.SessionSConns = []string{"test"}
 	expected = "<DiameterAgent> connection with id: <test> not defined"
 	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
@@ -489,6 +533,34 @@ func TestConfigSanityDAgent(t *testing.T) {
 		t.Errorf("Expecting: %+q  received: %+q", expected, err)
 	}
 	cfg.diameterAgentCfg.RequestProcessors[0].Filters = []string{"*string:~*req.Valid.Field"}
+
+	cfg.statsCfg.Enabled = false
+	cfg.diameterAgentCfg.StatSConns = []string{utils.ConcatenatedKey(utils.MetaInternal)}
+	expected = "<Stats> not enabled but requested by <DiameterAgent> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.statsCfg.Enabled = true
+
+	cfg.thresholdSCfg.Enabled = false
+	cfg.diameterAgentCfg.ThresholdSConns = []string{utils.ConcatenatedKey(utils.MetaInternal)}
+	expected = "<ThresholdS> not enabled but requested by <DiameterAgent> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.thresholdSCfg.Enabled = true
+
+	cfg.templates = FcTemplates{
+		utils.MetaEEs: {
+			{Tag: "XmlAttr", Path: "*req.filed", Type: "*variable",
+				AttributeID: "myattr",
+				Value:       NewRSRParsersMustCompile("~*req.Session-Id", utils.InfieldSep)},
+		},
+	}
+	expected = "<DiameterAgent> attribute_id is only supported on *rep and *exp paths, got *req.filed at XmlAttr"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Execting %+q recieved %+q", expected, err)
+	}
 }
 
 func TestConfigSanityRadiusAgent(t *testing.T) {
@@ -530,6 +602,22 @@ func TestConfigSanityRadiusAgent(t *testing.T) {
 	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
 		t.Errorf("Expecting: %+q  received: %+q", expected, err)
 	}
+	cfg.sessionSCfg.Enabled = true
+	cfg.radiusAgentCfg.StatSConns = []string{"test"}
+	expected = "<RadiusAgent> connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.radiusAgentCfg.StatSConns = []string{}
+
+	cfg.radiusAgentCfg.ThresholdSConns = []string{"test"}
+	expected = "<RadiusAgent> connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.radiusAgentCfg.ThresholdSConns = []string{}
+	cfg.sessionSCfg.Enabled = false
+
 	cfg.radiusAgentCfg.SessionSConns = []string{"test"}
 	expected = "<RadiusAgent> connection with id: <test> not defined"
 	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
@@ -609,6 +697,70 @@ func TestConfigSanityRadiusAgent(t *testing.T) {
 	if err := cfg.checkConfigSanity(); err != nil {
 		t.Error(err)
 	}
+
+	cfg.statsCfg.Enabled = false
+	cfg.radiusAgentCfg.StatSConns = []string{utils.ConcatenatedKey(utils.MetaInternal)}
+	expected = "<Stats> not enabled but requested by <RadiusAgent> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.statsCfg.Enabled = true
+
+	cfg.thresholdSCfg.Enabled = false
+	cfg.radiusAgentCfg.ThresholdSConns = []string{utils.ConcatenatedKey(utils.MetaInternal)}
+	expected = "<ThresholdS> not enabled but requested by <RadiusAgent> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.thresholdSCfg.Enabled = true
+	cfg.rpcConns["test"] = nil
+	cfg.radiusAgentCfg = &RadiusAgentCfg{
+		Enabled:       true,
+		SessionSConns: []string{"test"},
+		RequestProcessors: []*RequestProcessor{
+			{
+				ID: "attrTest",
+				RequestFields: []*FCTemplate{
+					{Tag: "XmlAttr", Path: "*req.filed", Type: "*variable",
+						AttributeID: "myattr",
+						Value:       NewRSRParsersMustCompile("~*req.Session-Id", utils.InfieldSep)},
+				},
+				ReplyFields: []*FCTemplate{},
+			},
+		},
+	}
+	expected = "<RadiusAgent> attribute_id is only supported on *rep and *exp paths, got *req.filed at XmlAttr"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("expected: %q, received: %q", expected, err)
+	}
+
+	cfg.radiusAgentCfg.RequestProcessors[0].RequestFields[0].Path = "*rep.filed"
+	cfg.radiusAgentCfg.RequestProcessors[0].RequestFields[0].AttributeID = "myattr"
+	if err := cfg.checkConfigSanity(); err != nil {
+		t.Errorf("unexpected error for *rep path: %v", err)
+	}
+
+	cfg.radiusAgentCfg.RequestProcessors[0].RequestFields[0].Path = "*exp.filed"
+	if err := cfg.checkConfigSanity(); err != nil {
+		t.Errorf("unexpected error for *exp path: %v", err)
+	}
+
+	cfg.radiusAgentCfg.RequestProcessors[0].RequestFields[0].Path = "*cgreq.filed"
+	cfg.radiusAgentCfg.RequestProcessors[0].RequestFields[0].AttributeID = ""
+	if err := cfg.checkConfigSanity(); err != nil {
+		t.Errorf("unexpected error without attribute_id: %v", err)
+	}
+
+	cfg.radiusAgentCfg.RequestProcessors[0].ReplyFields = []*FCTemplate{
+		{Tag: "XmlAttrtest", Path: "*req.filed", Type: "*variable",
+			AttributeID: "myattr",
+			Value:       NewRSRParsersMustCompile("~*req.Session-Id", utils.InfieldSep)},
+	}
+	expected = "<RadiusAgent> attribute_id is only supported on *rep and *exp paths, got *req.filed at XmlAttrtest"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Execting %+q recieved %+q", expected, err)
+	}
+
 }
 
 func TestConfigSanityDNSAgent(t *testing.T) {
@@ -640,6 +792,24 @@ func TestConfigSanityDNSAgent(t *testing.T) {
 	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
 		t.Errorf("Expecting: %+q  received: %+q", expected, err)
 	}
+
+	cfg.sessionSCfg.Enabled = true
+	cfg.dnsAgentCfg.StatSConns = []string{"test"}
+	expected = "<DNSAgent> connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.dnsAgentCfg.StatSConns = []string{}
+
+	cfg.dnsAgentCfg.ThresholdSConns = []string{"test"}
+	expected = "<DNSAgent> connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+
+	}
+	cfg.dnsAgentCfg.ThresholdSConns = []string{}
+	cfg.sessionSCfg.Enabled = false
+
 	cfg.dnsAgentCfg.SessionSConns = []string{"test"}
 	expected = "<DNSAgent> connection with id: <test> not defined"
 	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
@@ -710,6 +880,70 @@ func TestConfigSanityDNSAgent(t *testing.T) {
 	}
 	cfg.dnsAgentCfg.RequestProcessors[0].Filters = []string{"*string:~*req.Account:1001"}
 
+	cfg.statsCfg.Enabled = false
+	cfg.dnsAgentCfg.StatSConns = []string{utils.ConcatenatedKey(utils.MetaInternal)}
+	expected = "<Stats> not enabled but requested by <DNSAgent> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.statsCfg.Enabled = true
+
+	cfg.thresholdSCfg.Enabled = false
+	cfg.dnsAgentCfg.ThresholdSConns = []string{utils.ConcatenatedKey(utils.MetaInternal)}
+	expected = "<ThresholdS> not enabled but requested by <DNSAgent> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.thresholdSCfg.Enabled = true
+	cfg.rpcConns["test"] = nil
+	cfg.dnsAgentCfg = &DNSAgentCfg{
+		Enabled:       true,
+		SessionSConns: []string{"test"},
+		RequestProcessors: []*RequestProcessor{
+			{
+				ID: "attrTest",
+				RequestFields: []*FCTemplate{
+					{Tag: "XmlAttr", Path: "*req.filed", Type: "*variable",
+						AttributeID: "myattr",
+						Value:       NewRSRParsersMustCompile("~*req.Session-Id", utils.InfieldSep)},
+				},
+				ReplyFields: []*FCTemplate{},
+			},
+		},
+	}
+
+	expected = "<DNSAgent> attribute_id is only supported on *rep and *exp paths, got *req.filed at XmlAttr"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("expected: %q, received: %q", expected, err)
+	}
+
+	cfg.dnsAgentCfg.RequestProcessors[0].RequestFields[0].Path = "*rep.filed"
+	cfg.dnsAgentCfg.RequestProcessors[0].RequestFields[0].AttributeID = "myattr"
+	if err := cfg.checkConfigSanity(); err != nil {
+		t.Errorf("unexpected error for *rep path: %v", err)
+	}
+
+	cfg.dnsAgentCfg.RequestProcessors[0].RequestFields[0].Path = "*exp.filed"
+	if err := cfg.checkConfigSanity(); err != nil {
+		t.Errorf("unexpected error for *exp path: %v", err)
+	}
+
+	cfg.dnsAgentCfg.RequestProcessors[0].RequestFields[0].Path = "*cgreq.filed"
+	cfg.dnsAgentCfg.RequestProcessors[0].RequestFields[0].AttributeID = ""
+	if err := cfg.checkConfigSanity(); err != nil {
+		t.Errorf("unexpected error without attribute_id: %v", err)
+	}
+
+	cfg.dnsAgentCfg.RequestProcessors[0].ReplyFields = []*FCTemplate{
+		{Tag: "XmlAttrtest", Path: "*req.filed", Type: "*variable",
+			AttributeID: "myattr",
+			Value:       NewRSRParsersMustCompile("~*req.Session-Id", utils.InfieldSep)},
+	}
+	expected = "<DNSAgent> attribute_id is only supported on *rep and *exp paths, got *req.filed at XmlAttrtest"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Execting %+q recieved %+q", expected, err)
+	}
+
 }
 
 func TestConfigSanityHTTPAgent1(t *testing.T) {
@@ -744,6 +978,20 @@ func TestConfigSanityHTTPAgent1(t *testing.T) {
 		t.Errorf("Expecting: %+q  received: %+q", expected, err)
 	}
 	cfg.httpAgentCfg[0].SessionSConns = []string{}
+
+	cfg.httpAgentCfg[0].StatSConns = []string{"test"}
+	expected = "<HTTPAgent> template with ID <> has connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.httpAgentCfg[0].StatSConns = []string{}
+
+	cfg.httpAgentCfg[0].ThresholdSConns = []string{"test"}
+	expected = "<HTTPAgent> template with ID <> has connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.httpAgentCfg[0].ThresholdSConns = []string{}
 
 	cfg.httpAgentCfg[0].RequestPayload = "test"
 	expected = "<HTTPAgent> unsupported request payload test"
@@ -837,8 +1085,41 @@ func TestConfigSanityHTTPAgent1(t *testing.T) {
 	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
 		t.Errorf("Expecting: %+q  received: %+q", expected, err)
 	}
-}
+	cfg.statsCfg.Enabled = false
+	cfg.httpAgentCfg[0].StatSConns = []string{utils.ConcatenatedKey(utils.MetaInternal)}
+	expected = "<Stats> not enabled but requested by <> HTTPAgent Template"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.statsCfg.Enabled = true
 
+	cfg.thresholdSCfg.Enabled = false
+	cfg.httpAgentCfg[0].ThresholdSConns = []string{utils.ConcatenatedKey(utils.MetaInternal)}
+	expected = "<ThresholdS> not enabled but requested by <> HTTPAgent Template"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.thresholdSCfg.Enabled = true
+
+	cfg.httpAgentCfg[0].RequestProcessors[0].ReplyFields = []*FCTemplate{
+		{Tag: "XmlAttrtest", Path: "*req.filed", Type: "*variable",
+			AttributeID: "myattr",
+			Value:       NewRSRParsersMustCompile("~*req.Session-Id", utils.InfieldSep)},
+	}
+	expected = "<HTTPAgent> attribute_id is only supported on *rep and *exp paths, got *req.filed at XmlAttrtest"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Execting %+q recieved %+q", expected, err)
+	}
+	cfg.httpAgentCfg[0].RequestProcessors[0].RequestFields = []*FCTemplate{
+		{Tag: "XmlAttrtest", Path: "*req.filed", Type: "*variable",
+			AttributeID: "myattr",
+			Value:       NewRSRParsersMustCompile("~*req.Session-Id", utils.InfieldSep)},
+	}
+	expected = "<HTTPAgent> attribute_id is only supported on *rep and *exp paths, got *req.filed at XmlAttrtest"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Execting %+q recieved %+q", expected, err)
+	}
+}
 func TestConfigSanitySipAgent(t *testing.T) {
 	cfg := NewDefaultCGRConfig()
 
@@ -870,6 +1151,23 @@ func TestConfigSanitySipAgent(t *testing.T) {
 	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
 		t.Errorf("Expecting: %+q  received: %+q", expected, err)
 	}
+
+	cfg.sessionSCfg.Enabled = true
+	expected = "<SIPAgent> connection with id: <test> not defined"
+	cfg.sipAgentCfg.StatSConns = []string{"test"}
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.sipAgentCfg.StatSConns = []string{}
+
+	expected = "<SIPAgent> connection with id: <test> not defined"
+	cfg.sipAgentCfg.ThresholdSConns = []string{"test"}
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.sipAgentCfg.ThresholdSConns = []string{}
+	cfg.sessionSCfg.Enabled = false
+
 	expected = "<SIPAgent> connection with id: <test> not defined"
 	cfg.sipAgentCfg.SessionSConns = []string{"test"}
 	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
@@ -956,6 +1254,71 @@ func TestConfigSanitySipAgent(t *testing.T) {
 	expected = "<SIPAgent> Empty field path  for <*empty:~Field1..Field2[0]:*Test3:*Test4> for [*empty:~Field1..Field2[0]:*Test3:*Test4] at request_processors"
 	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
 		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+
+	cfg.statsCfg.Enabled = false
+	cfg.sipAgentCfg.StatSConns = []string{utils.ConcatenatedKey(utils.MetaInternal)}
+	expected = "<Stats> not enabled but requested by <SIPAgent> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.statsCfg.Enabled = true
+
+	cfg.thresholdSCfg.Enabled = false
+	cfg.sipAgentCfg.ThresholdSConns = []string{utils.ConcatenatedKey(utils.MetaInternal)}
+	expected = "<ThresholdS> not enabled but requested by <SIPAgent> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.thresholdSCfg.Enabled = true
+
+	cfg.rpcConns["test"] = nil
+	cfg.sipAgentCfg = &SIPAgentCfg{
+		Enabled:       true,
+		SessionSConns: []string{"test"},
+		RequestProcessors: []*RequestProcessor{
+			{
+				ID: "attrTest",
+				RequestFields: []*FCTemplate{
+					{Tag: "XmlAttr", Path: "*req.filed", Type: "*variable",
+						AttributeID: "myattr",
+						Value:       NewRSRParsersMustCompile("~*req.Session-Id", utils.InfieldSep)},
+				},
+				ReplyFields: []*FCTemplate{},
+			},
+		},
+	}
+
+	expected = "<SIPAgent> attribute_id is only supported on *rep and *exp paths, got *req.filed at XmlAttr"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("expected: %q, received: %q", expected, err)
+	}
+
+	cfg.sipAgentCfg.RequestProcessors[0].RequestFields[0].Path = "*rep.filed"
+	cfg.sipAgentCfg.RequestProcessors[0].RequestFields[0].AttributeID = "myattr"
+	if err := cfg.checkConfigSanity(); err != nil {
+		t.Errorf("unexpected error for *rep path: %v", err)
+	}
+
+	cfg.sipAgentCfg.RequestProcessors[0].RequestFields[0].Path = "*exp.filed"
+	if err := cfg.checkConfigSanity(); err != nil {
+		t.Errorf("unexpected error for *exp path: %v", err)
+	}
+
+	cfg.sipAgentCfg.RequestProcessors[0].RequestFields[0].Path = "*cgreq.filed"
+	cfg.sipAgentCfg.RequestProcessors[0].RequestFields[0].AttributeID = ""
+	if err := cfg.checkConfigSanity(); err != nil {
+		t.Errorf("unexpected error without attribute_id: %v", err)
+	}
+
+	cfg.sipAgentCfg.RequestProcessors[0].ReplyFields = []*FCTemplate{
+		{Tag: "XmlAttrtest", Path: "*req.filed", Type: "*variable",
+			AttributeID: "myattr",
+			Value:       NewRSRParsersMustCompile("~*req.Session-Id", utils.InfieldSep)},
+	}
+	expected = "<SIPAgent> attribute_id is only supported on *rep and *exp paths, got *req.filed at XmlAttrtest"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Execting %+q recieved %+q", expected, err)
 	}
 }
 
@@ -1290,6 +1653,17 @@ func TestConfigSanityEventReader(t *testing.T) {
 	}
 	cfg.ersCfg.Readers[0].CacheDumpFields[0].Filters = nil
 
+	cfg.ersCfg.Readers[0].CacheDumpFields = []*FCTemplate{
+		{Tag: "AttrTest", Path: "*req.Field", Type: "*variable", AttributeID: "myattr",
+			Value: NewRSRParsersMustCompile("~*req.Session-Id", utils.InfieldSep), Mandatory: true},
+	}
+
+	expected = "<ERs> attribute_id is only supported on *rep and *exp paths, got *req.Field at AttrTest"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("expected: %q, received: %q", expected, err)
+	}
+	cfg.ersCfg.Readers[0].CacheDumpFields = nil
+
 	//Fields
 	cfg.ersCfg.Readers[0].Fields[0].Path = "~Field1..Field2[0]"
 	expected = "<ERs> Empty field path  for ~Field1..Field2[0] at Path"
@@ -1326,6 +1700,85 @@ func TestConfigSanityEventReader(t *testing.T) {
 
 	cfg.ersCfg.Readers[0].Filters = []string{"*empty:~Field1..Field2[0]:*Test3:*Test4"}
 	expected = "<ERs> Empty field path  for <*empty:~Field1..Field2[0]:*Test3:*Test4> for [*empty:~Field1..Field2[0]:*Test3:*Test4] at readers"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+
+	cfg.ersCfg.Readers[0].Fields = []*FCTemplate{
+		{Tag: "AttrTest", Path: "*req.Field", Type: "*variable", AttributeID: "myattr",
+			Value: NewRSRParsersMustCompile("~*req.Session-Id", utils.InfieldSep), Mandatory: true},
+	}
+
+	expected = "<ERs> attribute_id is only supported on *rep and *exp paths, got *req.Field at AttrTest"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("expected: %q, received: %q", expected, err)
+	}
+	cfg.ersCfg.Readers[0].Fields = nil
+
+	cfg.eesCfg = &EEsCfg{
+		Enabled: true,
+		Exporters: []*EventExporterCfg{
+			{
+				ID:   "exp1",
+				Type: utils.MetaHTTPPost,
+			},
+			{
+				ID:   "exp2",
+				Type: utils.MetaHTTPPost,
+			},
+		},
+	}
+	cfg.ersCfg = &ERsCfg{
+		Enabled:       true,
+		EEsConns:      []string{utils.MetaInternal},
+		SessionSConns: []string{utils.MetaInternal},
+	}
+	cfg.sessionSCfg.Enabled = true
+	cfg.ersCfg.Readers = []*EventReaderCfg{{
+		ID:            "test5",
+		Type:          utils.MetaFileCSV,
+		ProcessedPath: "/",
+		SourcePath:    "/",
+		Opts: &EventReaderOpts{
+			PartialCacheAction: utils.StringPointer(utils.MetaNone),
+		},
+		EEsSuccessIDs: []string{"exp1"},
+		EEsFailedIDs:  []string{"exp2"},
+	}}
+
+	cfg.ersCfg.EEsConns = []string{}
+	cfg.ersCfg.Readers[0].EEsSuccessIDs = []string{"exp1"}
+	expected = "<ERs> connection to <EEs> required due to exporter ID references"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+
+	cfg.ersCfg.EEsConns = []string{utils.MetaInternal}
+	cfg.eesCfg.Enabled = false
+	expected = "<EEs> not enabled but requested by <ERs> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.eesCfg.Enabled = true
+	cfg.ersCfg.EEsConns = []string{utils.MetaInternal}
+	cfg.ersCfg.Readers[0].EEsSuccessIDs = []string{"noexp"}
+	expected = "<ERs> exporter with id noexp not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+
+	cfg.ersCfg.Readers[0].EEsSuccessIDs = []string{}
+	cfg.ersCfg.Readers[0].EEsFailedIDs = []string{"noexp"}
+	expected = "<ERs> exporter with id noexp not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+
+	cfg.sessionSCfg.Enabled = true
+	cfg.ersCfg.EEsConns = []string{"noexp"}
+	cfg.ersCfg.Readers[0].EEsFailedIDs = []string{}
+	cfg.ersCfg.Readers[0].EEsSuccessIDs = []string{}
+	expected = "<ERs> connection with id: <noexp> not defined"
 	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
 		t.Errorf("Expecting: %+q  received: %+q", expected, err)
 	}
@@ -1429,6 +1882,130 @@ func TestConfigSanityEventExporter(t *testing.T) {
 	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
 		t.Errorf("Expecting: %+q  received: %+q", expected, err)
 	}
+
+	cfg.eesCfg.Exporters[0].Fields = []*FCTemplate{
+		{Tag: "AttrTest", Path: "*req.Field", Type: "*variable", AttributeID: "myattr",
+			Value: NewRSRParsersMustCompile("~*req.Session-Id", utils.InfieldSep), Mandatory: true},
+	}
+	expected = "<EEs> attribute_id is only supported on *rep and *exp paths, got *req.Field at AttrTest"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("expected: %q, received: %q", expected, err)
+	}
+
+	cfg.eesCfg.Exporters[0].Type = utils.MetaElastic
+	invalidLogger := "invalidlogger"
+	cfg.eesCfg.Exporters[0].Opts = &EventExporterOpts{
+		Els: &ElsOpts{
+			Logger: &invalidLogger,
+		},
+	}
+	expected = "<EEs> invalid elsLogger value for exporter with ID: "
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting %v, recieved %v", expected, err)
+	}
+
+	cfg.eesCfg.Exporters[0].Type = utils.MetaElastic
+	invalidRefresh := "invalidrefresh"
+	cfg.eesCfg.Exporters[0].Opts = &EventExporterOpts{
+		Els: &ElsOpts{
+			Refresh: &invalidRefresh,
+		},
+	}
+	expected = "<EEs> invalid elsRefresh value for exporter with ID: "
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting %v, recieved %v", expected, err)
+	}
+
+	invalidOpType := "invalidOp"
+	cfg.eesCfg.Exporters[0].Opts = &EventExporterOpts{
+		Els: &ElsOpts{
+			OpType: &invalidOpType,
+		},
+	}
+	expected = "<EEs> invalid elsOpType value for exporter with ID: "
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting %v, recieved %v", expected, err)
+	}
+
+	nonExistenPath := "/inv/test"
+	cfg.eesCfg.Exporters[0].Opts = &EventExporterOpts{
+		Els: &ElsOpts{
+			CAPath: &nonExistenPath,
+		},
+	}
+	expected = "<EEs> CA certificate file not found at path: /inv/test for exporter with ID: "
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting %v, recieved %v", expected, err)
+	}
+
+	cfg.eesCfg.Exporters[0].Type = utils.MetaHTTPPost
+	cfg.eesCfg.Exporters[0].Filters = nil
+	cfg.eesCfg.Exporters[0].Fields = []*FCTemplate{
+		{Tag: "testfield",
+			Path:  "*rep.testfield",
+			Type:  "*variable",
+			Value: NewRSRParsersMustCompile("~*req.Session-Id", utils.InfieldSep)},
+	}
+
+	cfg.eesCfg.Exporters[0].MetricsResetSchedule = "0 12 * * *"
+	if err := cfg.checkConfigSanity(); err != nil {
+		t.Errorf("Expecting no error, recieved %v", err)
+	}
+
+	cfg.eesCfg.Exporters[0].MetricsResetSchedule = "invalid cron"
+	expected = `<EEs> invalid cron expression "invalid cron" in metrics_reset_schedule for exporter "": expected exactly 5 fields, found 2: [invalid cron]`
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting %v, recieved %v", expected, err)
+	}
+
+	cfg.eesCfg = &EEsCfg{
+		Enabled:         true,
+		AttributeSConns: []string{utils.MetaInternal},
+		Cache: map[string]*CacheParamCfg{
+			utils.MetaFileCSV: {
+				TTL: -1,
+			},
+		},
+	}
+	cfg.attributeSCfg.Enabled = true
+	expected = "<EEs> exporter type \"*file_csv\" requires positive cache TTL, got -1ns"
+	if err := cfg.CheckConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.eesCfg = &EEsCfg{
+		Enabled:         true,
+		AttributeSConns: []string{utils.MetaInternal},
+		Cache: map[string]*CacheParamCfg{
+			utils.MetaFileCSV: {
+				TTL: 0,
+			},
+		},
+	}
+	cfg.attributeSCfg.Enabled = true
+	expected = "<EEs> exporter type \"*file_csv\" requires positive cache TTL, got 0s"
+	if err := cfg.CheckConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+
+	cfg.eesCfg = &EEsCfg{
+		Enabled:         true,
+		AttributeSConns: []string{utils.MetaInternal},
+		Cache: map[string]*CacheParamCfg{
+			utils.MetaFileCSV: {
+				TTL: 1,
+			},
+		},
+	}
+	cfg.cacheCfg.Partitions = map[string]*CacheParamCfg{
+		utils.CacheRPCConnections: {
+			Replicate: true,
+		},
+	}
+	expected = "<CacheS> partition <*rpc_connections> does not support replication"
+	if err := cfg.CheckConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+
 }
 
 func TestConfigSanityCache(t *testing.T) {
@@ -1603,6 +2180,49 @@ func TestConfigSanityStorDB(t *testing.T) {
 	}
 }
 
+func TestConfigSanityStorDBpgSSLCertModeTest(t *testing.T) {
+	cfg := NewDefaultCGRConfig()
+	cfg.storDbCfg = &StorDbCfg{
+		Type: utils.MetaPostgres,
+		Opts: &StorDBOpts{
+			PgSSLMode:     utils.PgSSLModeDisable,
+			PgSSLCertMode: "wongCertMode",
+		},
+	}
+	expected := "<stor_db> unsupported pgSSLCertMode (sslcertmode) in storDB configuration"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+}
+
+func TestConfigSanityStorDBInternalDBFileSizeLimit(t *testing.T) {
+	cfg := NewDefaultCGRConfig()
+	cfg.storDbCfg = &StorDbCfg{
+		Type: utils.MetaInternal,
+		Opts: &StorDBOpts{
+			InternalDBDumpInterval:    time.Duration(1 * time.Second),
+			InternalDBRewriteInterval: time.Duration(2 * time.Second),
+			InternalDBFileSizeLimit:   -1,
+		},
+	}
+	expected := "<stor_db> internalDBFileSizeLimit field cannot be equal or smaller than 0: <-1>"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.storDbCfg = &StorDbCfg{
+		Type: utils.MetaInternal,
+		Opts: &StorDBOpts{
+			InternalDBDumpInterval:    time.Duration(1 * time.Second),
+			InternalDBRewriteInterval: time.Duration(2 * time.Second),
+			InternalDBFileSizeLimit:   0,
+		},
+	}
+	expected = "<stor_db> internalDBFileSizeLimit field cannot be equal or smaller than 0: <0>"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+}
+
 func TestConfigSanityAnalyzer(t *testing.T) {
 	cfg := NewDefaultCGRConfig()
 
@@ -1715,6 +2335,43 @@ func TestConfigSanityDataDB(t *testing.T) {
 		},
 	}
 	expected = "<data_db> unsupported transport <*none> for connection with ID: <*internal>"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+
+	cfg.dataDbCfg.Type = utils.MetaInternal
+	cfg.dataDbCfg.Opts = &DataDBOpts{
+		InternalDBDumpInterval:    10,
+		InternalDBRewriteInterval: 0,
+		InternalDBFileSizeLimit:   0,
+		InternalDBStartTimeout:    0,
+	}
+	expected = "<data_db> internalDBFileSizeLimit field cannot be equal or smaller than 0: <0>"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+
+	cfg.dataDbCfg.Type = utils.MetaInternal
+	cfg.dataDbCfg.Opts = &DataDBOpts{
+		InternalDBDumpInterval:    10,
+		InternalDBRewriteInterval: 0,
+		InternalDBFileSizeLimit:   -1,
+		InternalDBStartTimeout:    0,
+	}
+	expected = "<data_db> internalDBFileSizeLimit field cannot be equal or smaller than 0: <-1>"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+
+	cfg.dataDbCfg.Type = utils.MetaInternal
+	cfg.cacheCfg = &CacheCfg{
+		Partitions: map[string]*CacheParamCfg{
+			utils.CacheAccounts: {
+				Limit: 1,
+			},
+		},
+	}
+	expected = "<CacheS> *accounts needs to be 0 when DataBD is *internal and with no persistence, received : 1"
 	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
 		t.Errorf("Expecting: %+q  received: %+q", expected, err)
 	}
@@ -1869,7 +2526,7 @@ func TestCheckConfigSanity(t *testing.T) {
 	}
 	cfg.statsCfg.Enabled = true
 	cfg.cdrsCfg.OnlineCDRExports = []string{"stringy"}
-	expected = "<CDRs> cannot find exporter with ID: <stringy>"
+	expected = "<CDRs> cannot find exporters with IDs: <stringy>"
 	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
 		t.Errorf("Expecting: %+q  received: %+q", expected, err)
 	}
@@ -1936,6 +2593,69 @@ func TestConfigSanityErs(t *testing.T) {
 	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
 		t.Errorf("expected: <%v>,\n received: <%v>", expected, err)
 	}
+
+	cfg.sessionSCfg.Enabled = true
+	cfg.ersCfg.EEsConns = []string{"test"}
+	expected = "<ERs> connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.ersCfg.EEsConns = []string{}
+
+	cfg.ersCfg.StatSConns = []string{"test"}
+	expected = "<ERs> connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.ersCfg.StatSConns = []string{}
+
+	cfg.ersCfg.ThresholdSConns = []string{"test"}
+	expected = "<ERs> connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.ersCfg.ThresholdSConns = []string{}
+	cfg.sessionSCfg.Enabled = false
+
+	cfg.eesCfg.Enabled = false
+	cfg.ersCfg.EEsConns = []string{utils.ConcatenatedKey(utils.MetaInternal)}
+	expected = "<EEs> not enabled but requested by <ERs> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.eesCfg.Enabled = true
+
+	cfg.statsCfg.Enabled = false
+	cfg.ersCfg.StatSConns = []string{utils.ConcatenatedKey(utils.MetaInternal)}
+	expected = "<Stats> not enabled but requested by <ERs> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.statsCfg.Enabled = true
+
+	cfg.thresholdSCfg.Enabled = false
+	cfg.ersCfg.ThresholdSConns = []string{utils.ConcatenatedKey(utils.MetaInternal)}
+	expected = "<ThresholdS> not enabled but requested by <ERs> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.thresholdSCfg.Enabled = true
+
+	cfg.ersCfg.Readers = []*EventReaderCfg{
+		{
+			Type:          utils.MetaFileCSV,
+			ID:            "ID1",
+			ProcessedPath: utils.EmptyString,
+			SourcePath:    "test.csv",
+			Opts: &EventReaderOpts{
+				PartialCacheAction: utils.StringPointer(utils.MetaPostCDR),
+			},
+		},
+	}
+	expected = "<ERs> nonexistent folder: test.csv for reader with ID: ID1"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
 }
 
 func TestConfigSanityERsXmlRootPath(t *testing.T) {
@@ -1994,5 +2714,199 @@ func TestConfigSanityERsXmlRootPath(t *testing.T) {
 	err = cfg.checkConfigSanity()
 	if err == nil || err.Error() != experr {
 		t.Errorf("expected: %s, received: %s", experr, err)
+	}
+}
+
+func TestConfigSanityAttributeIDPath(t *testing.T) {
+	cfg := NewDefaultCGRConfig()
+	cfg.sessionSCfg.Enabled = true
+	cfg.rpcConns["test"] = nil
+
+	cfg.diameterAgentCfg = &DiameterAgentCfg{
+		Enabled:       true,
+		SessionSConns: []string{"test"},
+		RequestProcessors: []*RequestProcessor{
+			{
+				ID: "attrTest",
+				RequestFields: []*FCTemplate{
+					{Tag: "XmlAttr", Path: "*req.SomeField", Type: "*variable",
+						AttributeID: "myattr",
+						Value:       NewRSRParsersMustCompile("~*req.Session-Id", utils.InfieldSep)},
+				},
+				ReplyFields: []*FCTemplate{},
+			},
+		},
+	}
+
+	expected := "<DiameterAgent> attribute_id is only supported on *rep and *exp paths, got *req.SomeField at XmlAttr"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("expected: %q, received: %q", expected, err)
+	}
+
+	// attribute_id on *rep path should pass
+	cfg.diameterAgentCfg.RequestProcessors[0].RequestFields[0].Path = "*rep.SomeField"
+	cfg.diameterAgentCfg.RequestProcessors[0].RequestFields[0].AttributeID = "myattr"
+	if err := cfg.checkConfigSanity(); err != nil {
+		t.Errorf("unexpected error for *rep path: %v", err)
+	}
+
+	// attribute_id on *exp path should pass
+	cfg.diameterAgentCfg.RequestProcessors[0].RequestFields[0].Path = "*exp.SomeField"
+	if err := cfg.checkConfigSanity(); err != nil {
+		t.Errorf("unexpected error for *exp path: %v", err)
+	}
+
+	// no attribute_id should always pass
+	cfg.diameterAgentCfg.RequestProcessors[0].RequestFields[0].Path = "*cgreq.SomeField"
+	cfg.diameterAgentCfg.RequestProcessors[0].RequestFields[0].AttributeID = ""
+	if err := cfg.checkConfigSanity(); err != nil {
+		t.Errorf("unexpected error without attribute_id: %v", err)
+	}
+
+	cfg.diameterAgentCfg.RequestProcessors[0].ReplyFields = []*FCTemplate{
+		{Tag: "XmlAttrtest", Path: "*req.SomeField", Type: "*variable",
+			AttributeID: "myattr",
+			Value:       NewRSRParsersMustCompile("~*req.Session-Id", utils.InfieldSep)},
+	}
+	expected = "<DiameterAgent> attribute_id is only supported on *rep and *exp paths, got *req.SomeField at XmlAttrtest"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Execting %+q recieved %+q", expected, err)
+	}
+}
+func TestConfigSanityThresholdS(t *testing.T) {
+	cfg := NewDefaultCGRConfig()
+	cfg.thresholdSCfg.Enabled = true
+	cfg.thresholdSCfg.ApierSConns = []string{utils.MetaInternal}
+
+	expected := "<ApierS> not enabled but requested by <ThresholdS> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Execting %+q recieved %+q", expected, err)
+	}
+
+	cfg.thresholdSCfg.ApierSConns = []string{"test"}
+	expected = "<ThresholdS> connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting %+q recieved %+q", expected, err)
+	}
+}
+
+func TestConfigSanityTrendS(t *testing.T) {
+	cfg := NewDefaultCGRConfig()
+	cfg.trendsCfg.Enabled = true
+	cfg.trendsCfg.StatSConns = []string{utils.MetaInternal}
+
+	expected := "<Stats> not enabled but requested by <TrendS> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Execting %+q recieved %+q", expected, err)
+	}
+
+	cfg.trendsCfg.StatSConns = []string{"test"}
+	expected = "<TrendS> connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting %+q recieved %+q", expected, err)
+	}
+}
+
+func TestConfigSanityPrometheusAgent(t *testing.T) {
+	cfg := NewDefaultCGRConfig()
+
+	cfg.prometheusAgentCfg.Enabled = true
+	cfg.prometheusAgentCfg.StatSConns = []string{utils.MetaInternal}
+	cfg.prometheusAgentCfg.ApierSConns = []string{utils.MetaInternal}
+	expected := "<ApierS> not enabled but requested by <PrometheusAgent> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Execting %+q recieved %+q", expected, err)
+	}
+
+	cfg.prometheusAgentCfg.ApierSConns = []string{utils.MetaInternal, "test"}
+	cfg.prometheusAgentCfg.StatQueueIDs = []string{}
+	expected = "<PrometheusAgent> when StatQueueIDs is empty, apiers_conns must match stats_conns length to fetch StatQueue IDs"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Execting %+q recieved %+q", expected, err)
+	}
+	cfg.sessionSCfg.Enabled = true
+	cfg.prometheusAgentCfg.ApierSConns = []string{"test"}
+	expected = "<PrometheusAgent> connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting %+q recieved %+q", expected, err)
+	}
+	cfg.prometheusAgentCfg.ApierSConns = []string{utils.MetaInternal}
+
+	cfg.apier.Enabled = true
+	cfg.prometheusAgentCfg.StatSConns = []string{"test"}
+	expected = "<PrometheusAgent> connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting %+q recieved %+q", expected, err)
+	}
+	cfg.prometheusAgentCfg.StatSConns = []string{}
+
+	cfg.statsCfg.Enabled = true
+	cfg.prometheusAgentCfg.CacheSConns = []string{"test"}
+	expected = "<PrometheusAgent> connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting %+q recieved %+q", expected, err)
+	}
+	cfg.prometheusAgentCfg.CacheSConns = []string{}
+
+	cfg.prometheusAgentCfg.CoreSConns = []string{"test"}
+	expected = "<PrometheusAgent> connection with id: <test> not defined"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting %+q recieved %+q", expected, err)
+	}
+	cfg.prometheusAgentCfg.CoreSConns = []string{}
+	cfg.sessionSCfg.Enabled = false
+
+	cfg.statsCfg.Enabled = false
+	cfg.prometheusAgentCfg.StatSConns = []string{utils.ConcatenatedKey(utils.MetaInternal)}
+	expected = "<StatS> not enabled but requested by <PrometheusAgent> component"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+	cfg.statsCfg.Enabled = true
+
+	cfg.rpcConns = map[string]*RPCConn{
+		"test": {},
+	}
+	cfg.prometheusAgentCfg.Enabled = true
+	cfg.prometheusAgentCfg.CoreSConns = []string{"test"}
+	cfg.prometheusAgentCfg.CollectProcessMetrics = true
+
+	expected = "<PrometheusAgent> collect_go_metrics and collect_process_metrics cannot be enabled when using CoreSConns"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("Expecting: %+q  received: %+q", expected, err)
+	}
+}
+
+func TestConfigSanityCDRsOnlineCDRExportss(t *testing.T) {
+	cfg := NewDefaultCGRConfig()
+	cfg.cdrsCfg.Enabled = true
+	cfg.cdrsCfg.OnlineCDRExports = []string{"invalid_id"}
+
+	expected := "<CDRs> cannot find exporters with IDs: <invalid_id>"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("expecting %+q received %+q", expected, err)
+	}
+
+	cfg.eesCfg.Exporters = []*EventExporterCfg{
+		{ID: "http_billing_event"},
+	}
+	cfg.cdrsCfg.OnlineCDRExports = []string{"http_billing_event", "test", "fake_ees_id", ""}
+
+	expected = `<CDRs> cannot find exporters with IDs: <test, fake_ees_id, >`
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("expecting %+q received %+q", expected, err)
+	}
+
+	cfg.cdrsCfg.OnlineCDRExports = []string{"http_billing_event"}
+
+	if err := cfg.checkConfigSanity(); err != nil {
+		t.Errorf("unexpected error for valid exporter ID: %v", err)
+	}
+
+	cfg.cdrsCfg.OnlineCDRExports = []string{""}
+
+	expected = "<CDRs> cannot find exporters with IDs: <>"
+	if err := cfg.checkConfigSanity(); err == nil || err.Error() != expected {
+		t.Errorf("expecting %+q received %+q", expected, err)
 	}
 }

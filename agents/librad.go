@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package agents
 
@@ -30,7 +15,7 @@ func radAppendAttributes(packet *radigo.Packet, nm *utils.OrderedNavigableMap) e
 	for el := nm.GetFirstElement(); el != nil; el = el.Next() {
 		path := el.Value
 		cfgItm, _ := nm.Field(path)
-		path = path[:len(path)-1]        // remove the last index
+		path = utils.StripTrailingIndex(path)
 		if path[0] == MetaRadReplyCode { // Special case used to control the reply code of RADIUS reply
 			if err := packet.SetCodeWithName(utils.IfaceAsString(cfgItm.Data)); err != nil {
 				return err
@@ -108,12 +93,11 @@ func (pk *radiusDP) FieldAsString(fldPath []string) (string, error) {
 
 // radauthReq is used to authorize a request based on flags
 func radauthReq(flags utils.FlagsWithParams, req *radigo.Packet, aReq *AgentRequest, rpl *radigo.Packet) (bool, error) {
-	// try to get UserPassword from Vars as slice of NMItems
 	nmItems, has := aReq.Vars.Map[utils.UserPassword]
 	if !has {
 		return false, utils.ErrNotFound
 	}
-	pass := nmItems.Slice[0].Value.String()
+	pass := nmItems.Value.String()
 	switch {
 	case flags.Has(utils.MetaPAP):
 		userPassAvps := req.AttributesWithName(UserPasswordAVP, utils.EmptyString)

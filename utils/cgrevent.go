@@ -1,25 +1,9 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package utils
 
 import (
-	"strings"
 	"time"
 )
 
@@ -197,37 +181,22 @@ func GetRoutePaginatorFromOpts(ev map[string]any) (args Paginator, err error) {
 	return
 }
 
-// NMAsCGREvent builds a CGREvent considering Time as time.Now()
-// and Event as linear map[string]any with joined paths
-// treats particular case when the value of map is []*NMItem - used in agents/AgentRequest
-func NMAsCGREvent(nM *OrderedNavigableMap, tnt string, pathSep string, opts MapStorage) (cgrEv *CGREvent) {
+// NMAsCGREvent builds a CGREvent from a navigable map with nested paths.
+func NMAsCGREvent(nM *OrderedNavigableMap, tnt string, opts MapStorage) *CGREvent {
 	if nM == nil {
-		return
+		return nil
 	}
-	el := nM.GetFirstElement()
-	if el == nil {
-		return
+	ev := nM.AsMap()
+	if len(ev) == 0 {
+		return nil
 	}
-	cgrEv = &CGREvent{
+	return &CGREvent{
 		Tenant:  tnt,
 		ID:      UUIDSha1Prefix(),
 		Time:    TimePointer(time.Now()),
-		Event:   make(map[string]any),
+		Event:   ev,
 		APIOpts: opts,
 	}
-	for ; el != nil; el = el.Next() {
-		path := el.Value
-		val, _ := nM.Field(path) // this should never return error cause we get the path from the order
-		if val.AttributeID != "" {
-			continue
-		}
-		path = path[:len(path)-1] // remove the last index
-		opath := strings.Join(path, NestingSep)
-		if _, has := cgrEv.Event[opath]; !has {
-			cgrEv.Event[opath] = val.Data // first item which is not an attribute will become the value
-		}
-	}
-	return
 }
 
 // SetCloneable sets if the args should be clonned on internal connections

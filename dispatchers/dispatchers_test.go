@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package dispatchers
 
@@ -1844,4 +1829,34 @@ func TestDispatcherServiceDispatcherProfilesForEventBoolOptsErr(t *testing.T) {
 		t.Errorf("\nExpected <%+v>, \nReceived <%+v>", expected, err)
 	}
 
+}
+
+func TestDispatcherServiceDispatchNoProfilesFound(t *testing.T) {
+	cfg := config.NewDefaultCGRConfig()
+	cfg.DispatcherSCfg().IndexedSelects = false
+	rpcCl := map[string]chan birpc.ClientConnector{}
+	connMng := engine.NewConnManager(cfg, rpcCl)
+	dataDB, derr := engine.NewInternalDB(nil, nil, true, nil, cfg.DataDbCfg().Items)
+	if derr != nil {
+		t.Error(derr)
+	}
+	dm := engine.NewDataManager(dataDB, nil, connMng)
+	dss := NewDispatcherService(dm, cfg, nil, connMng)
+	ev := &utils.CGREvent{}
+	tnt := ""
+	subsys := utils.IfaceAsString(ev.APIOpts[utils.MetaSubsys])
+	dPrfls, _ := dss.dispatcherProfilesForEvent(tnt, ev, utils.MapStorage{
+		utils.MetaReq:  ev.Event,
+		utils.MetaOpts: ev.APIOpts,
+	}, subsys)
+
+	expectedErr := "DISPATCHER_ERROR:NOT_FOUND"
+	err := dss.Dispatch(ev, subsys, "", "", "")
+	if err == nil || err.Error() != expectedErr {
+		t.Errorf("\nExpected <%+v>, \nReceived <%+v>", expectedErr, err)
+	}
+
+	if len(dPrfls) != 0 {
+		t.Errorf("Expected 0 profiles, got %d", len(dPrfls))
+	}
 }

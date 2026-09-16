@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package engine
 
 import (
@@ -2235,6 +2221,126 @@ func TestThresholdProcessEvent(t *testing.T) {
 				t.Errorf("expected: %v, received: %v", tt.matchedthIDs, thIDs)
 			}
 
+		})
+	}
+}
+
+func TestThresholdProfileClone(t *testing.T) {
+	tests := []struct {
+		name       string
+		thresholdP *ThresholdProfile
+	}{
+		{
+			name: "Compelete ThresholdProfile",
+			thresholdP: &ThresholdProfile{
+				Tenant:    "cgrates.org",
+				ID:        "THD_ACNT_1001",
+				FilterIDs: []string{"*string:~*req.Account:1001"},
+				ActivationInterval: &utils.ActivationInterval{
+					ActivationTime: time.Date(2014, 7, 29, 15, 0, 0, 0, time.UTC),
+				},
+				MaxHits:   1,
+				MinHits:   1,
+				MinSleep:  1 * time.Second,
+				Blocker:   true,
+				Weight:    10,
+				ActionIDs: []string{"ACT_LOG_WARNING"},
+				Async:     true,
+				EeIDs:     []string{"eeID1", "eeID2"},
+			},
+		},
+		{
+			name: "Nil fields",
+			thresholdP: &ThresholdProfile{
+				Tenant:             "cgrates.org",
+				ID:                 "THD_ACNT_1001",
+				FilterIDs:          nil,
+				ActivationInterval: nil,
+				MaxHits:            1,
+				MinHits:            1,
+				MinSleep:           1 * time.Second,
+				Blocker:            true,
+				Weight:             10,
+				ActionIDs:          nil,
+				Async:              true,
+				EeIDs:              nil,
+			},
+		},
+		{
+			name:       "Nil case",
+			thresholdP: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rcv := tt.thresholdP.Clone()
+
+			if !reflect.DeepEqual(rcv, tt.thresholdP) {
+				t.Errorf("Clone() = %v, want %v", rcv, tt.thresholdP)
+			}
+
+			if rcv != nil && rcv == tt.thresholdP {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
+	}
+}
+
+func TestThresholdClone(t *testing.T) {
+	tests := []struct {
+		name      string
+		threshold *Threshold
+	}{
+		{
+			name: "Complete Threshold",
+			threshold: &Threshold{
+				Tenant: "cgrates.org",
+				ID:     "TH1",
+				Hits:   2,
+				tPrfl: &ThresholdProfile{
+					Tenant:    "cgrates.org",
+					ID:        "THD_ACNT_1001",
+					FilterIDs: []string{"*string:~*req.Account:1001"},
+					ActivationInterval: &utils.ActivationInterval{
+						ActivationTime: time.Date(2014, 7, 29, 15, 0, 0, 0, time.UTC),
+					},
+					MaxHits:   1,
+					MinHits:   1,
+					MinSleep:  1 * time.Second,
+					Blocker:   true,
+					Weight:    10,
+					ActionIDs: []string{"ACT_LOG_WARNING"},
+					Async:     true,
+					EeIDs:     []string{"eeID1", "eeID2"},
+				},
+				dirty: utils.BoolPointer(false),
+			},
+		},
+		{
+			name: "Nil fields",
+			threshold: &Threshold{
+				Tenant: "",
+				ID:     "",
+				Hits:   2,
+				tPrfl:  nil,
+				dirty:  utils.BoolPointer(false),
+			},
+		},
+		{
+			name:      "Nil case",
+			threshold: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			rcv := tt.threshold.Clone()
+
+			if !reflect.DeepEqual(rcv, tt.threshold) {
+				t.Errorf("Clone() = %v, want %v", rcv, tt.threshold)
+			}
+			if rcv != nil && rcv == tt.threshold {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
 		})
 	}
 }

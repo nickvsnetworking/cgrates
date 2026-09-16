@@ -1,22 +1,7 @@
 //go:build flaky
 
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package general_tests
 
@@ -27,7 +12,6 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 	"path"
 	"reflect"
 	"runtime"
@@ -42,7 +26,8 @@ import (
 	"github.com/cgrates/cgrates/engine"
 	"github.com/cgrates/cgrates/utils"
 	amqp "github.com/rabbitmq/amqp091-go"
-	kafka "github.com/segmentio/kafka-go"
+	"github.com/twmb/franz-go/pkg/kadm"
+	"github.com/twmb/franz-go/pkg/kgo"
 )
 
 var (
@@ -98,6 +83,7 @@ var (
 		testCDRsExpInitDB,
 		testCDRsExpPrepareHTTP,
 		testCDRsExpPrepareAMQP,
+		testCDRsExpPrepareKafka,
 		testCDRsExpStartEngine,
 		testCDRsExpInitRPC,
 		testCDRsExpLoadAddCharger,
@@ -109,6 +95,7 @@ var (
 		testCDRsExpStopEngine,
 		testCDRsExpStopHTTPServer,
 		testCDRsExpCloseAMQP,
+		testCDRsExpCloseKafka,
 	}
 )
 
@@ -206,6 +193,18 @@ func testCDRsExpPrepareAMQP(t *testing.T) {
 	}
 }
 
+func testCDRsExpPrepareKafka(t *testing.T) {
+	cl, err := kgo.NewClient(kgo.SeedBrokers("localhost:9092"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cl.Close()
+	adm := kadm.NewClient(cl)
+	if _, err := adm.CreateTopics(context.Background(), 1, 1, nil, "cgrates_cdrs"); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func testCDRsExpStartEngine(t *testing.T) {
 	runtime.Gosched()
 	if _, err := engine.StopStartEngine(cdrsExpCfgPath, *utils.WaitRater); err != nil {
@@ -237,10 +236,6 @@ func testCDRsExpLoadAddCharger(t *testing.T) {
 }
 
 func testCDRsExpExportEvent(t *testing.T) {
-	// stop RabbitMQ server so we can test reconnects
-	if err := exec.Command("service", "rabbitmq-server", "stop").Run(); err != nil {
-		t.Error(err)
-	}
 	var reply string
 	if err := cdrsExpRPC.Call(context.Background(), utils.CDRsV1ProcessEvent,
 		&engine.ArgV1ProcessEvent{
@@ -249,16 +244,6 @@ func testCDRsExpExportEvent(t *testing.T) {
 		}, &reply); err == nil || err.Error() != utils.ErrPartiallyExecuted.Error() { // some exporters will fail
 		t.Error("Unexpected error: ", err)
 	}
-	// time.Sleep(50 * time.Millisecond)
-	// filesInDir, _ := os.ReadDir(cdrsExpCfg.EEsCfg().Exporters[1].FailedPostsDir)
-	// if len(filesInDir) != 0 {
-	// 	t.Errorf("Should be no files in directory: %s", cdrsExpCfg.EEsCfg().Exporters[1].FailedPostsDir)
-	// }
-	// start RabbitMQ server so we can test reconnects
-	if err := exec.Command("service", "rabbitmq-server", "start").Run(); err != nil {
-		t.Error(err)
-	}
-	time.Sleep(2 * time.Second)
 	var err error
 	if cdrsExpAMQPCon, err = amqp.Dial("amqp://guest:guest@localhost:5672/"); err != nil {
 		t.Fatal(err)
@@ -302,29 +287,32 @@ func testCDRsExpAMQP(t *testing.T) {
 }
 
 func testCDRsExpKafka(t *testing.T) {
-	reader := kafka.NewReader(kafka.ReaderConfig{
-		Brokers: []string{"localhost:9092"},
-		Topic:   "cgrates_cdrs",
-		GroupID: "tmp",
-		MaxWait: time.Millisecond,
-	})
-
-	defer reader.Close()
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	var m kafka.Message
-	var err error
-	if m, err = reader.ReadMessage(ctx); err != nil {
+	cl, err := kgo.NewClient(
+		kgo.SeedBrokers("localhost:9092"),
+		kgo.ConsumeTopics("cgrates_cdrs"),
+		kgo.ConsumerGroup("tmp"),
+		kgo.FetchMaxWait(10*time.Millisecond),
+	)
+	if err != nil {
 		t.Fatal(err)
 	}
-	var rcvCDR map[string]any
-	if err := json.Unmarshal(m.Value, &rcvCDR); err != nil {
-		t.Error(err)
+	defer cl.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	fetches := cl.PollFetches(ctx)
+	if errs := fetches.Errors(); len(errs) > 0 {
+		t.Fatal(errs[0].Err)
 	}
+	var rcvCDR map[string]any
+	fetches.EachRecord(func(r *kgo.Record) {
+		if err := json.Unmarshal(r.Value, &rcvCDR); err != nil {
+			t.Error(err)
+		}
+	})
 	if !reflect.DeepEqual(cdrsExpEvExp, rcvCDR) {
 		t.Errorf("Expected %s received %s", utils.ToJSON(cdrsExpEvExp), utils.ToJSON(rcvCDR))
 	}
-	cancel()
 }
 
 func checkContent(ev *ees.ExportEvents, content []any) error {
@@ -394,6 +382,16 @@ func testCDRsExpStopHTTPServer(t *testing.T) {
 	if err = cdrsExpHTTPServer.Shutdown(context.Background()); err != nil {
 		t.Fatal(err)
 	}
+}
+
+func testCDRsExpCloseKafka(t *testing.T) {
+	cl, err := kgo.NewClient(kgo.SeedBrokers("localhost:9092"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer cl.Close()
+	adm := kadm.NewClient(cl)
+	_, _ = adm.DeleteTopics(context.Background(), "cgrates_cdrs")
 }
 
 func testCDRsExpCloseAMQP(t *testing.T) {

@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package agents
 
@@ -23,7 +8,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/cgrates/aringo"
@@ -43,6 +27,7 @@ const (
 	ARIStasisStart           = "StasisStart"
 	ARIChannelStateChange    = "ChannelStateChange"
 	ARIChannelDestroyed      = "ChannelDestroyed"
+	ARIRESTResponse          = "RESTResponse"
 	eventType                = "eventType"
 	channelID                = "channelID"
 	channelState             = "channelState"
@@ -58,11 +43,10 @@ const (
 func NewAsteriskAgent(cgrCfg *config.CGRConfig, astConnIdx int,
 	connMgr *engine.ConnManager, caps *engine.Caps) (*AsteriskAgent, error) {
 	sma := &AsteriskAgent{
-		cgrCfg:      cgrCfg,
-		astConnIdx:  astConnIdx,
-		connMgr:     connMgr,
-		caps:        caps,
-		eventsCache: make(map[string]*utils.CGREvent),
+		cgrCfg:     cgrCfg,
+		astConnIdx: astConnIdx,
+		connMgr:    connMgr,
+		caps:       caps,
 	}
 	srv, err := birpc.NewServiceWithMethodsRename(sma, utils.AgentV1, true, func(oldFn string) (newFn string) {
 		return strings.TrimPrefix(oldFn, "V1")
@@ -76,21 +60,19 @@ func NewAsteriskAgent(cgrCfg *config.CGRConfig, astConnIdx int,
 
 // ARIConnector abstracts the transport layer (HTTP or WebSocket) for sending ARI commands.
 type ARIConnector interface {
-	Call(method, uri string, queryStr map[string]string, bodyParams map[string]string) (aringo.RESTResponse, error)
+	Call(method, uri string, queryStr map[string]string, body []byte) (aringo.RESTResponse, error)
 }
 
 // AsteriskAgent used to cominicate with asterisk
 type AsteriskAgent struct {
-	cgrCfg      *config.CGRConfig // Separate from smCfg since there can be multiple
-	connMgr     *engine.ConnManager
-	caps        *engine.Caps
-	astConnIdx  int
-	astConn     ARIConnector
-	astEvChan   chan map[string]any
-	astErrChan  chan error
-	eventsCache map[string]*utils.CGREvent // used to gather information about events during various phases
-	evCacheMux  sync.RWMutex               // Protect eventsCache
-	ctx         *context.Context
+	cgrCfg     *config.CGRConfig // Separate from smCfg since there can be multiple
+	connMgr    *engine.ConnManager
+	caps       *engine.Caps
+	astConnIdx int
+	astConn    ARIConnector
+	astEvChan  chan map[string]any
+	astErrChan chan error
+	ctx        *context.Context
 }
 
 func (sma *AsteriskAgent) connectAsterisk(stopChan <-chan struct{}) (err error) {
@@ -98,13 +80,13 @@ func (sma *AsteriskAgent) connectAsterisk(stopChan <-chan struct{}) (err error) 
 	sma.astEvChan = make(chan map[string]any)
 	sma.astErrChan = make(chan error)
 	if connCfg.AriWebSocket {
-		sma.astConn, err = aringo.NewARInGO(fmt.Sprintf("ws://%s/ari/events?api_key=%s:%s&app=%s",
+		sma.astConn, err = aringo.NewARInGO(fmt.Sprintf("ws://%s/ari/events?api_key=%s:%s&app=%s&subscribeAll=true",
 			connCfg.Address, connCfg.User, connCfg.Password, CGRAuthAPP), "http://cgrates.org",
 			connCfg.User, connCfg.Password, fmt.Sprintf("%s@%s", utils.CGRateS, utils.Version),
 			sma.astEvChan, sma.astErrChan, stopChan, connCfg.ConnectAttempts, connCfg.Reconnects,
 			connCfg.MaxReconnectInterval, utils.FibDuration)
 	} else {
-		sma.astConn, err = aringo.NewARInGOV1(fmt.Sprintf("ws://%s/ari/events?api_key=%s:%s&app=%s",
+		sma.astConn, err = aringo.NewARInGOV1(fmt.Sprintf("ws://%s/ari/events?api_key=%s:%s&app=%s&subscribeAll=true",
 			connCfg.Address, connCfg.User, connCfg.Password, CGRAuthAPP), "http://cgrates.org",
 			connCfg.User, connCfg.Password, connCfg.Address, fmt.Sprintf("%s@%s", utils.CGRateS, utils.Version),
 			sma.astEvChan, sma.astErrChan, stopChan, connCfg.ConnectAttempts, connCfg.Reconnects,
@@ -113,11 +95,33 @@ func (sma *AsteriskAgent) connectAsterisk(stopChan <-chan struct{}) (err error) 
 	return
 }
 
+func (sma *AsteriskAgent) filterEventTypes() {
+	filterEv := struct {
+		Allowed []map[string]string `json:"allowed"`
+	}{
+		Allowed: []map[string]string{
+			{"type": ARIStasisStart},
+			{"type": ARIChannelStateChange},
+			{"type": ARIChannelDestroyed},
+			{"type": ARIRESTResponse},
+		}}
+	body, err := json.Marshal(filterEv)
+	if err != nil {
+		utils.Logger.Warning(err.Error())
+		return
+	}
+	if _, err := sma.astConn.Call(aringo.HTTP_PUT,
+		fmt.Sprintf("applications/%s/eventFilter", CGRAuthAPP), nil, body); err != nil {
+		utils.Logger.Warning(err.Error())
+	}
+}
+
 // ListenAndServe is called to start the service
 func (sma *AsteriskAgent) ListenAndServe(stopChan <-chan struct{}) (err error) {
 	if err = sma.connectAsterisk(stopChan); err != nil {
 		return
 	}
+	sma.filterEventTypes()
 	utils.Logger.Info(fmt.Sprintf("<%s> successfully connected to Asterisk at: <%s>",
 		utils.AsteriskAgent, sma.cgrCfg.AsteriskAgentCfg().AsteriskConns[sma.astConnIdx].Address))
 	// make a call asterisk -> sessions_conns to create an active client needed for syncSessions when restoring sessions, since prior clients are lost when engine shuts down
@@ -166,8 +170,8 @@ func (sma *AsteriskAgent) hangupChannel(channelID, warnMsg string) {
 	if warnMsg != "" {
 		utils.Logger.Warning(warnMsg)
 	}
-	if _, err := sma.astConn.Call(aringo.HTTP_DELETE, fmt.Sprintf("channels/%s", channelID), nil,
-		map[string]string{"reason": "congestion"}); err != nil {
+	if _, err := sma.astConn.Call(aringo.HTTP_DELETE, fmt.Sprintf("channels/%s", channelID),
+		map[string]string{"reason": "congestion"}, nil); err != nil {
 		utils.Logger.Warning(
 			fmt.Sprintf("<%s> failed disconnecting channel <%s>, err: %s",
 				utils.AsteriskAgent, channelID, err.Error()))
@@ -183,15 +187,6 @@ func (sma *AsteriskAgent) handleStasisStart(ev *SMAsteriskEvent) {
 			return
 		}
 		defer sma.caps.Deallocate()
-	}
-	// Subscribe for channel updates even after we leave Stasis
-	if _, err := sma.astConn.Call(aringo.HTTP_POST,
-		fmt.Sprintf("applications/%s/subscription", CGRAuthAPP), map[string]string{"eventSource": fmt.Sprintf("channel:%s", ev.ChannelID())}, nil); err != nil {
-		// Since we got error, disconnect channel
-		sma.hangupChannel(ev.ChannelID(),
-			fmt.Sprintf("<%s> error: %s subscribing for channelID: %s",
-				utils.AsteriskAgent, err.Error(), ev.ChannelID()))
-		return
 	}
 	//authorize Session
 	authArgs := ev.V1AuthorizeArgs()
@@ -272,10 +267,6 @@ func (sma *AsteriskAgent) handleStasisStart(ev *SMAsteriskEvent) {
 		fmt.Sprintf("channels/%s/continue",
 			ev.ChannelID()), nil, nil); err != nil {
 	}
-	// Done with processing event, cache it for later use
-	sma.evCacheMux.Lock()
-	sma.eventsCache[ev.ChannelID()] = authArgs.CGREvent
-	sma.evCacheMux.Unlock()
 }
 
 // Ussually channelUP
@@ -283,27 +274,26 @@ func (sma *AsteriskAgent) handleChannelStateChange(ev *SMAsteriskEvent) {
 	if ev.ChannelState() != channelUp {
 		return
 	}
+	if !ev.IsCGRChannel() {
+		return
+	}
 	if sma.caps.IsLimited() {
 		if err := sma.caps.Allocate(); err != nil {
-			utils.Logger.Warning(
+			sma.hangupChannel(ev.ChannelID(),
 				fmt.Sprintf("<%s> caps limit reached, rejecting state change for channel %s: %v",
 					utils.AsteriskAgent, ev.ChannelID(), err))
 			return
 		}
 		defer sma.caps.Deallocate()
 	}
-	sma.evCacheMux.RLock()
-	cgrEvDisp, hasIt := sma.eventsCache[ev.ChannelID()]
-	sma.evCacheMux.RUnlock()
-	if !hasIt { // Not handled by us
+	cgrEvDisp, err := ev.AsCGREvent(sma.cgrCfg.GeneralCfg().DefaultTimezone)
+	if err != nil {
+		utils.Logger.Warning(fmt.Sprintf("<AsteriskAgent> Error converting Asterisk event to CGREvent: <%v>", err))
 		return
 	}
-	sma.evCacheMux.Lock()
-	err := ev.UpdateCGREvent(cgrEvDisp) // Updates the event directly in the cache
-	sma.evCacheMux.Unlock()
-	if err != nil {
-		sma.hangupChannel(ev.ChannelID(),
-			fmt.Sprintf("<%s> error: %s when attempting to initiate session for channelID: %s",
+	if err := ev.RestoreAndUpdateFields(cgrEvDisp); err != nil {
+		utils.Logger.Warning(
+			fmt.Sprintf("<%s> error: %s restoring channel vars for channelID: %s",
 				utils.AsteriskAgent, err.Error(), ev.ChannelID()))
 		return
 	}
@@ -333,6 +323,9 @@ func (sma *AsteriskAgent) handleChannelStateChange(ev *SMAsteriskEvent) {
 
 // Channel disconnect
 func (sma *AsteriskAgent) handleChannelDestroyed(ev *SMAsteriskEvent) {
+	if !ev.IsCGRChannel() {
+		return
+	}
 	if sma.caps.IsLimited() {
 		if err := sma.caps.Allocate(); err != nil {
 			utils.Logger.Warning(
@@ -343,58 +336,18 @@ func (sma *AsteriskAgent) handleChannelDestroyed(ev *SMAsteriskEvent) {
 		defer sma.caps.Deallocate()
 	}
 	chID := ev.ChannelID()
-	sma.evCacheMux.RLock()
-	cgrEvDisp, hasIt := sma.eventsCache[chID]
-	sma.evCacheMux.RUnlock()
-	if !hasIt {
-		channelVar, ok := ev.ariEv["channel"].(map[string]any)
-		if !ok {
-			utils.Logger.Warning(fmt.Sprintf(
-				"<%s> missing or invalid 'channel' field in event: %s",
-				utils.AsteriskAgent, utils.ToJSON(ev.ariEv)))
-			return
-		}
+	cgrEvDisp, err := ev.AsCGREvent(sma.cgrCfg.GeneralCfg().DefaultTimezone)
+	if err != nil {
+		utils.Logger.Warning(fmt.Sprintf("<AsteriskAgent> Error converting Asterisk event to CGREvent: <%v>", err))
+		return
+	}
+	if err := ev.RestoreAndUpdateFields(cgrEvDisp); err != nil {
+		utils.Logger.Warning(
+			fmt.Sprintf("<%s> error: %s restoring channel vars for channelID: %s",
+				utils.AsteriskAgent, err.Error(), chID))
+		return
+	}
 
-		channelVars, ok := channelVar["channelvars"].(map[string]any)
-		if !ok {
-			utils.Logger.Warning(fmt.Sprintf(
-				"<%s> missing or invalid 'channelvars' field in 'channel': %s",
-				utils.AsteriskAgent, utils.ToJSON(channelVar)))
-			return
-		}
-		if cgrReqType := utils.IfaceAsString(channelVars[utils.CGRReqType]); cgrReqType == "" {
-			return
-		}
-		// convert received event to CGREvent
-		var err error
-		cgrEvDisp, err = ev.AsCGREvent(sma.cgrCfg.GeneralCfg().DefaultTimezone)
-		if err != nil {
-			utils.Logger.Warning(fmt.Sprintf("<AsteriskAgent> Error converting Asterisk event to CGREvent: <%v>", err))
-			return
-		}
-		// Populate event with needed fields recovered from channel variables
-		sma.evCacheMux.Lock()
-		err = ev.RestoreAndUpdateFields(cgrEvDisp)
-		sma.evCacheMux.Unlock()
-		if err != nil {
-			utils.Logger.Warning(
-				fmt.Sprintf("<%s> error: %s when attempting to destroy session for channelID: %s",
-					utils.AsteriskAgent, err.Error(), chID))
-			return
-		}
-	}
-	if hasIt {
-		sma.evCacheMux.Lock()
-		delete(sma.eventsCache, chID)       // delete the event from cache as we do not need to keep it here forever
-		err := ev.UpdateCGREvent(cgrEvDisp) // Updates the event directly in the cache
-		sma.evCacheMux.Unlock()
-		if err != nil {
-			utils.Logger.Warning(
-				fmt.Sprintf("<%s> error: %s when attempting to destroy session for channelID: %s",
-					utils.AsteriskAgent, err.Error(), chID))
-			return
-		}
-	}
 	// populate terminate session args
 	tsArgs := ev.V1TerminateSessionArgs(*cgrEvDisp)
 	if tsArgs == nil {
@@ -467,5 +420,10 @@ func (*AsteriskAgent) V1DisconnectPeer(*context.Context, *utils.DPRArgs, *string
 
 // V1WarnDisconnect is used to implement the sessions.BiRPClient interface
 func (sma *AsteriskAgent) V1WarnDisconnect(*context.Context, map[string]any, *string) error {
+	return utils.ErrNotImplemented
+}
+
+// V1SpendingStatusNotification is used to implement the sessions.BiRPClient interface
+func (sma *AsteriskAgent) V1SpendingStatusNotification(*context.Context, *utils.CGREvent, *string) error {
 	return utils.ErrNotImplemented
 }

@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package config
 
@@ -1807,27 +1792,24 @@ func (cfg *CGRConfig) V1SetConfig(ctx *context.Context, args *SetConfigArgs, rep
 	if b, err = json.Marshal(args.Config); err != nil {
 		return
 	}
-	cfgV := cfg
-	if args.DryRun {
-		cfgV = cfg.Clone()
-	}
-
+	cfgV := cfg.Clone()
 	cfgV.reloadDPCache(sections...)
 	if err = cfgV.loadCfgFromJSONWithLocks(bytes.NewBuffer(b), sections); err != nil {
 		return
 	}
-
-	//  lock all sections
+	// lock all sections
 	cfgV.rLockSections()
-
 	err = cfgV.checkConfigSanity()
-
 	cfgV.rUnlockSections() // unlock before checking the error
 	if err != nil {
 		return
 	}
 	if !args.DryRun {
-		cfgV.reloadSections(sections...)
+		cfg.reloadDPCache(sections...)
+		if err = cfg.loadCfgFromJSONWithLocks(bytes.NewBuffer(b), sections); err != nil {
+			return
+		}
+		cfg.reloadSections(sections...)
 	}
 	*reply = utils.OK
 	return

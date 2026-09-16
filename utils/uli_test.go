@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package utils
 
@@ -170,6 +155,19 @@ func TestDecodeULI(t *testing.T) {
 	}
 }
 
+func TestDecodeULIShortHex(t *testing.T) {
+	data, err := hex.DecodeString("03")
+	if err != nil {
+		t.Fatalf("invalid test hex: %v", err)
+	}
+
+	_, err = DecodeULI(data)
+	expectedErr := "ULI data too short"
+	if err.Error() != expectedErr {
+		t.Errorf("DecodeULI should have returned error for short ULI data, got %v, wanted %v", err.Error(), expectedErr)
+	}
+}
+
 func TestULI_GetField(t *testing.T) {
 	uli := &ULI{
 		TAI: &TAI{
@@ -192,6 +190,24 @@ func TestULI_GetField(t *testing.T) {
 			MNC: "260",
 			NCI: 0x123456789,
 		},
+		SAI: &SAI{
+			MCC: "262",
+			MNC: "01",
+			LAC: 0x1234,
+			SAC: 0xABCD,
+		},
+		RAI: &RAI{
+			MCC: "262",
+			MNC: "01",
+			LAC: 0x1234,
+			RAC: 0x56,
+		},
+		CGI: &CGI{
+			MCC: "262",
+			MNC: "01",
+			LAC: 0x1234,
+			CI:  0x5678,
+		},
 	}
 
 	tests := []struct {
@@ -199,6 +215,15 @@ func TestULI_GetField(t *testing.T) {
 		expected any
 	}{
 		{"TAI", uli.TAI},
+		{"SAI", uli.SAI},
+		{"SAI.LAC", uint16(0x1234)},
+		{"SAI.SAC", uint16(0xABCD)},
+		{"RAI", uli.RAI},
+		{"RAI.LAC", uint16(0x1234)},
+		{"RAI.RAC", uint8(0x56)},
+		{"CGI", uli.CGI},
+		{"CGI.LAC", uint16(0x1234)},
+		{"CGI.CI", uint16(0x5678)},
 		{"TAI.MCC", "547"},
 		{"TAI.MNC", "05"},
 		{"TAI.TAC", uint16(1)},
@@ -234,14 +259,15 @@ func TestULI_GetField(t *testing.T) {
 }
 
 func TestULI_GetField_Errors(t *testing.T) {
-	uli := &ULI{
-		TAI: &TAI{MCC: "547", MNC: "05", TAC: 1},
-	}
+	uli := &ULI{}
 
 	tests := []struct {
 		name string
 		path string
 	}{
+		{"missing TAI", "TAI"},
+		{"missing SAI", "SAI"},
+		{"missing RAI", "RAI"},
 		{"missing ECGI", "ECGI"},
 		{"missing CGI", "CGI"},
 		{"missing TAI5GS", "TAI5GS"},
@@ -262,6 +288,38 @@ func TestULI_GetField_Errors(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestULIGetFieldInvalid(t *testing.T) {
+	uli := &ULI{
+		TAI: &TAI{
+			MCC: "54",
+			MNC: "0",
+			TAC: 1,
+		},
+	}
+
+	tests := []struct {
+		name string
+		path string
+	}{
+		{"invalid field", "TAI.INVALID"},
+		{"invalid component", "INVALID"},
+		{"empty path", ""},
+		{"invalid MCC subfield", "TAI.MCC.Invalid"},
+		{"invalid MNC subfield", "TAI.MNC.Invalid"},
+		{"subfield on TAC", "TAI.TAC.Name"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := uli.GetField(tt.path)
+			if err == nil {
+				t.Errorf("GetField(%q) should have returned error", tt.path)
+			}
+		})
+	}
+
 }
 
 func TestULIConverter(t *testing.T) {
@@ -437,6 +495,93 @@ func TestULIConverter_Errors(t *testing.T) {
 			if err == nil {
 				t.Error("Convert should have returned error")
 			}
+		})
+	}
+}
+
+func TestCountryName(t *testing.T) {
+
+	tests := []struct {
+		name string
+		mcc  string
+		want string
+	}{
+		{
+			name: "Valid countryName",
+			mcc:  "310",
+			want: "United States",
+		},
+		{
+			name: "Invalid countryName",
+			mcc:  "30",
+			want: "",
+		},
+		{
+			name: "Empty countryName",
+			mcc:  "",
+			want: "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := countryName(tt.mcc)
+
+			expErr := `unknown MCC: ` + tt.mcc
+
+			if err != nil && err.Error() != expErr {
+				t.Errorf("Expected error: %v, but got %v", expErr, err)
+			}
+
+			if got != tt.want {
+				t.Errorf("Got %v, wanted %v", got, tt.want)
+			}
+
+		})
+	}
+}
+
+func TestNetworkName(t *testing.T) {
+	tests := []struct {
+		name string
+		mcc  string
+		mnc  string
+		want string
+	}{
+
+		{
+			name: "Valid networkName",
+			mcc:  "001",
+			mnc:  "001",
+			want: "Test network",
+		},
+		{
+			name: "Invalid networkName",
+			mcc:  "0",
+			mnc:  "0",
+			want: "",
+		},
+		{
+			name: "Empty networkName",
+			mcc:  "",
+			mnc:  "",
+			want: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := networkName(tt.mcc, tt.mnc)
+
+			expErr := `unknown MCC-MNC: ` + tt.mcc + "-" + tt.mnc
+
+			if err != nil && err.Error() != expErr {
+				t.Errorf("Expected error: %v, but got %v", expErr, err)
+			}
+
+			if got != tt.want {
+				t.Errorf("Got %v, wanted %v", got, tt.want)
+			}
+
 		})
 	}
 }

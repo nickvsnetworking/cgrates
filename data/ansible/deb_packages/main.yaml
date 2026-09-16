@@ -2,6 +2,9 @@
 - hosts: apt
   vars:
     rootUser: root
+    nginx_server_name: apt.cgrates.org
+    cgrates_dir: "/home/{{ user }}/go/src/github.com/cgrates/cgrates"
+    cgrates_branch: master
 
     dependencies:
       - build-essential
@@ -34,7 +37,7 @@
 
     - name: Check if NGINX needs to be configured
       become: true
-      ansible.builtin.shell: "ls /etc/nginx/sites-enabled | grep 'apt.cgrates.org.vhost'"
+      ansible.builtin.shell: "ls /etc/nginx/sites-enabled | grep '{{ nginx_server_name }}.vhost'"
       ignore_errors: true
       register: nginxConfig
 
@@ -147,20 +150,18 @@
 
     ###########################################################################################################################
     ###########################################################################################################################
-    - name: Set up cgrates
-      ansible.builtin.import_role:
-        name: ../../roles/cgrates
-      vars:
-        cgrates_bin_path: ""
-        cgrates_dbs: []
-        cgrates_dependencies: []
+    - name: Clone cgrates source
+      ansible.builtin.git:
+        repo: https://github.com/cgrates/cgrates.git
+        dest: "{{ cgrates_dir }}"
+        version: "{{ cgrates_branch }}"
+        update: true
+        force: true
 
-    - name: Sync the go mod with vendor
-      ansible.builtin.command:
-        cmd: go mod vendor
-        chdir: "{{ cgrates_dir }}"
-      environment:
-        PATH: "{{ ansible_env.PATH }}:/usr/local/go/bin"
+    - name: Remove leftover dependencies/ from a prior failed deb build
+      ansible.builtin.file:
+        path: "{{ cgrates_dir }}/dependencies"
+        state: absent
 
     - name: Get current Git tag
       ansible.builtin.command: git tag -l --points-at HEAD
@@ -243,9 +244,16 @@
             - not (skip_reprepro | default(false))
             - cgrates_branch == 'master' or git_tag_result.stdout_lines | length > 0
 
-        - name: Copy the file to PKG server
-          ansible.builtin.command: "scp {{ reprepro_basedir }}/incoming/{{ item.path | basename }} {{ pkgAddr }}:/tmp/"
-          with_items: "{{ package_files.files }}"
+        - name: Find debs for PKG server
+          ansible.builtin.find:
+            paths: "{{ reprepro_basedir }}/incoming"
+            patterns: "cgrates_*~deb*u1_amd64.deb"
+            file_type: file
+          register: pkg_debs
+
+        - name: Copy debs to PKG server
+          ansible.builtin.command: "scp {{ item.path }} {{ pkgAddr }}:/tmp/"
+          with_items: "{{ pkg_debs.files }}"
 
       rescue:
         - name: Find all files in incoming directory
@@ -318,6 +326,8 @@
 
 - hosts: pkg
   vars:
+    rootUser: root
+    nginx_server_name: pkg.cgrates.org
     nginx_user: "www-data"
     cgrates_branch: "master"
     distributions:
@@ -326,12 +336,39 @@
       - codename: bullseye
         version: 11
   tasks:
+    - name: Install nginx
+      become: true
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+
+    - name: Check if NGINX needs to be configured
+      become: true
+      ansible.builtin.shell: "ls /etc/nginx/sites-enabled | grep '{{ nginx_server_name }}.vhost'"
+      ignore_errors: true
+      register: nginxConfig
+
+    - name: Configure NGINX server
+      ansible.builtin.include_tasks: nginx.yaml
+      when: nginxConfig.stdout_lines | length < 1
+
+    - name: Enable and start nginx
+      ansible.builtin.systemd:
+        name: nginx
+        state: started
+        masked: false
+        enabled: true
+
     - name: Add user to www-data group
       become: true
       ansible.builtin.user:
         name: "{{ user }}"
         groups: "{{ nginx_user }}"
         append: true
+
+    - name: Install fecopack service
+      ansible.builtin.import_role:
+        name: ../roles/fecopack
 
     - name: Create directory
       become: true

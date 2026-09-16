@@ -1,25 +1,9 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package ees
 
 import (
-	"strings"
 	"sync"
 	"time"
 
@@ -100,20 +84,7 @@ func (e *RPCee) PrepareMap(mp *utils.CGREvent) (any, error) {
 }
 
 func (e *RPCee) PrepareOrderMap(oMp *utils.OrderedNavigableMap) (any, error) {
-	mP := make(map[string]any)
-	for i := oMp.GetFirstElement(); i != nil; i = i.Next() {
-		path := i.Value
-		val, _ := oMp.Field(path)
-		if val.AttributeID != utils.EmptyString {
-			continue
-		}
-		path = path[:len(path)-1] // remove the last index
-		opath := strings.Join(path, utils.NestingSep)
-		if _, has := mP[opath]; !has {
-			mP[opath] = val.Data // first item which is not an attribute will become the value
-		}
-	}
-	return mP, nil
+	return oMp.AsMap(), nil
 }
 
 func (e *RPCee) parseOpts() (err error) {

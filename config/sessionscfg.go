@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package config
 
@@ -91,7 +76,7 @@ func (fs *FsConnCfg) AsMapInterface() map[string]any {
 }
 
 // Clone returns a deep copy of FsConnCfg
-func (fs FsConnCfg) Clone() *FsConnCfg {
+func (fs *FsConnCfg) Clone() *FsConnCfg {
 	return &FsConnCfg{
 		Address:              fs.Address,
 		Password:             fs.Password,
@@ -105,6 +90,7 @@ func (fs FsConnCfg) Clone() *FsConnCfg {
 // SessionSCfg is the config section for SessionS
 type SessionSCfg struct {
 	Enabled                bool
+	ApierSConns            []string
 	ChargerSConns          []string
 	RALsConns              []string
 	IPsConns               []string
@@ -125,6 +111,7 @@ type SessionSCfg struct {
 	SessionIndexes         utils.StringSet
 	ClientProtocol         float64
 	ChannelSyncInterval    time.Duration
+	ChannelSyncTimeout     time.Duration
 	StaleChanMaxExtraUsage time.Duration
 	TerminateAttempts      int
 	AlterableFields        utils.StringSet
@@ -141,6 +128,16 @@ func (scfg *SessionSCfg) loadFromJSONCfg(jsnCfg *SessionSJsonCfg) (err error) {
 	}
 	if jsnCfg.Enabled != nil {
 		scfg.Enabled = *jsnCfg.Enabled
+	}
+	if jsnCfg.ApierSConns != nil {
+		scfg.ApierSConns = make([]string, len(*jsnCfg.ApierSConns))
+		for idx, connID := range *jsnCfg.ApierSConns {
+			// if we have the connection internal we change the name so we can have internal rpc for each subsystem
+			scfg.ApierSConns[idx] = connID
+			if connID == utils.MetaInternal {
+				scfg.ApierSConns[idx] = utils.ConcatenatedKey(utils.MetaInternal, utils.MetaApier)
+			}
+		}
 	}
 	if jsnCfg.ChargerSConns != nil {
 		scfg.ChargerSConns = make([]string, len(*jsnCfg.ChargerSConns))
@@ -251,6 +248,11 @@ func (scfg *SessionSCfg) loadFromJSONCfg(jsnCfg *SessionSJsonCfg) (err error) {
 			return err
 		}
 	}
+	if jsnCfg.ChannelSyncTimeout != nil {
+		if scfg.ChannelSyncTimeout, err = utils.ParseDurationWithNanosecs(*jsnCfg.ChannelSyncTimeout); err != nil {
+			return err
+		}
+	}
 	if jsnCfg.StaleChanMaxExtraUsage != nil {
 		if scfg.StaleChanMaxExtraUsage, err = utils.ParseDurationWithNanosecs(*jsnCfg.StaleChanMaxExtraUsage); err != nil {
 			return err
@@ -304,6 +306,7 @@ func (scfg *SessionSCfg) AsMapInterface() (initialMP map[string]any) {
 	}
 	initialMP = map[string]any{
 		utils.EnabledCfg:                scfg.Enabled,
+		utils.ApierSConnsCfg:            stripInternalConns(scfg.ApierSConns),
 		utils.ChargerSConnsCfg:          stripInternalConns(scfg.ChargerSConns),
 		utils.RALsConnsCfg:              stripInternalConns(scfg.RALsConns),
 		utils.IPsConnsCfg:               stripInternalConns(scfg.IPsConns),
@@ -323,6 +326,7 @@ func (scfg *SessionSCfg) AsMapInterface() (initialMP map[string]any) {
 		utils.STIRCfg:                   scfg.STIRCfg.AsMapInterface(),
 		utils.MinDurLowBalanceCfg:       "0",
 		utils.ChannelSyncIntervalCfg:    "0",
+		utils.ChannelSyncTimeoutCfg:     "0",
 		utils.StaleChanMaxExtraUsageCfg: "0",
 		utils.DebitIntervalCfg:          "0",
 		utils.SessionTTLCfg:             "0",
@@ -350,6 +354,9 @@ func (scfg *SessionSCfg) AsMapInterface() (initialMP map[string]any) {
 	if scfg.ChannelSyncInterval != 0 {
 		initialMP[utils.ChannelSyncIntervalCfg] = scfg.ChannelSyncInterval.String()
 	}
+	if scfg.ChannelSyncTimeout != 0 {
+		initialMP[utils.ChannelSyncTimeoutCfg] = scfg.ChannelSyncTimeout.String()
+	}
 	if scfg.StaleChanMaxExtraUsage != 0 {
 		initialMP[utils.StaleChanMaxExtraUsageCfg] = scfg.StaleChanMaxExtraUsage.String()
 	}
@@ -364,7 +371,10 @@ func (scfg *SessionSCfg) AsMapInterface() (initialMP map[string]any) {
 }
 
 // Clone returns a deep copy of SessionSCfg
-func (scfg SessionSCfg) Clone() (cln *SessionSCfg) {
+func (scfg *SessionSCfg) Clone() (cln *SessionSCfg) {
+	if scfg == nil {
+		return nil
+	}
 	cln = &SessionSCfg{
 		Enabled:                scfg.Enabled,
 		IPsConns:               slices.Clone(scfg.IPsConns),
@@ -374,6 +384,7 @@ func (scfg SessionSCfg) Clone() (cln *SessionSCfg) {
 		BackupInterval:         scfg.BackupInterval,
 		ClientProtocol:         scfg.ClientProtocol,
 		ChannelSyncInterval:    scfg.ChannelSyncInterval,
+		ChannelSyncTimeout:     scfg.ChannelSyncTimeout,
 		StaleChanMaxExtraUsage: scfg.StaleChanMaxExtraUsage,
 		TerminateAttempts:      scfg.TerminateAttempts,
 		MinDurLowBalance:       scfg.MinDurLowBalance,
@@ -403,6 +414,11 @@ func (scfg SessionSCfg) Clone() (cln *SessionSCfg) {
 		*cln.SessionTTLLastUsage = *scfg.SessionTTLLastUsage
 	}
 
+	if scfg.ApierSConns != nil {
+		cln.ApierSConns = make([]string, len(scfg.ApierSConns))
+		copy(cln.ApierSConns, scfg.ApierSConns)
+
+	}
 	if scfg.ChargerSConns != nil {
 		cln.ChargerSConns = make([]string, len(scfg.ChargerSConns))
 		copy(cln.ChargerSConns, scfg.ChargerSConns)
@@ -575,7 +591,10 @@ func (fscfg *FsAgentCfg) AsMapInterface(separator string) (initialMP map[string]
 }
 
 // Clone returns a deep copy of FsAgentCfg
-func (fscfg FsAgentCfg) Clone() (cln *FsAgentCfg) {
+func (fscfg *FsAgentCfg) Clone() (cln *FsAgentCfg) {
+	if fscfg == nil {
+		return nil
+	}
 	cln = &FsAgentCfg{
 		Enabled:                fscfg.Enabled,
 		SubscribePark:          fscfg.SubscribePark,
@@ -671,7 +690,7 @@ func (aConnCfg *AsteriskConnCfg) AsMapInterface() map[string]any {
 }
 
 // Clone returns a deep copy of AsteriskConnCfg
-func (aConnCfg AsteriskConnCfg) Clone() *AsteriskConnCfg {
+func (aConnCfg *AsteriskConnCfg) Clone() *AsteriskConnCfg {
 	return &AsteriskConnCfg{
 		Alias:                aConnCfg.Alias,
 		Address:              aConnCfg.Address,
@@ -758,7 +777,10 @@ func (aCfg *AsteriskAgentCfg) AsMapInterface() (initialMP map[string]any) {
 }
 
 // Clone returns a deep copy of AsteriskAgentCfg
-func (aCfg AsteriskAgentCfg) Clone() (cln *AsteriskAgentCfg) {
+func (aCfg *AsteriskAgentCfg) Clone() (cln *AsteriskAgentCfg) {
+	if aCfg == nil {
+		return nil
+	}
 	cln = &AsteriskAgentCfg{
 		Enabled:      aCfg.Enabled,
 		CreateCDR:    aCfg.CreateCDR,
@@ -828,7 +850,10 @@ func (stirCfg *STIRcfg) AsMapInterface() (initialMP map[string]any) {
 }
 
 // Clone returns a deep copy of STIRcfg
-func (stirCfg STIRcfg) Clone() *STIRcfg {
+func (stirCfg *STIRcfg) Clone() *STIRcfg {
+	if stirCfg == nil {
+		return nil
+	}
 	return &STIRcfg{
 		AllowedAttest:      stirCfg.AllowedAttest.Clone(),
 		PayloadMaxduration: stirCfg.PayloadMaxduration,

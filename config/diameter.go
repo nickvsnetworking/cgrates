@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package config
 
@@ -33,25 +18,29 @@ type DiameterListener struct {
 
 // DiameterAgentCfg the config section that describes the Diameter Agent
 type DiameterAgentCfg struct {
-	Enabled                 bool // enables the diameter agent: <true|false>
-	Listeners               []DiameterListener
-	DictionariesPath        string
-	CeApplications          []string
-	SessionSConns           []string
-	StatSConns              []string
-	ThresholdSConns         []string
-	OriginHost              string
-	OriginRealm             string
-	VendorID                int
-	ProductName             string
-	SyncedConnReqs          bool
-	ASRTemplate             string
-	RARTemplate             string
-	ForcedDisconnect        string
-	ConnStatusStatQueueIDs  []string
-	ConnStatusThresholdIDs  []string
-	ConnHealthCheckInterval time.Duration // peer connection health check interval (0 to disable)
-	RequestProcessors       []*RequestProcessor
+	Enabled                    bool // enables the diameter agent: <true|false>
+	Listeners                  []DiameterListener
+	DictionariesPath           string
+	DictionariesAppendDefaults bool
+	CeApplications             []string
+	SessionSConns              []string
+	StatSConns                 []string
+	ThresholdSConns            []string
+	OriginHost                 string
+	OriginRealm                string
+	VendorID                   int
+	ProductName                string
+	SyncedConnReqs             bool
+	ASRTemplate                string
+	RARTemplate                string
+	SNRTemplate                string
+	SLRTemplate                string
+	STRTemplate                string
+	ForcedDisconnect           string
+	ConnStatusStatQueueIDs     []string
+	ConnStatusThresholdIDs     []string
+	ConnHealthCheckInterval    time.Duration // peer connection health check interval (0 to disable)
+	RequestProcessors          []*RequestProcessor
 }
 
 func (da *DiameterAgentCfg) loadFromJSONCfg(jc *DiameterAgentJsonCfg, separator string) (err error) {
@@ -76,6 +65,9 @@ func (da *DiameterAgentCfg) loadFromJSONCfg(jc *DiameterAgentJsonCfg, separator 
 	}
 	if jc.DictionariesPath != nil {
 		da.DictionariesPath = *jc.DictionariesPath
+	}
+	if jc.DictionariesAppendDefaults != nil {
+		da.DictionariesAppendDefaults = *jc.DictionariesAppendDefaults
 	}
 	if jc.CeApplications != nil {
 		da.CeApplications = make([]string, len(*jc.CeApplications))
@@ -118,6 +110,15 @@ func (da *DiameterAgentCfg) loadFromJSONCfg(jc *DiameterAgentJsonCfg, separator 
 	}
 	if jc.RARTemplate != nil {
 		da.RARTemplate = *jc.RARTemplate
+	}
+	if jc.SNRTemplate != nil {
+		da.SNRTemplate = *jc.SNRTemplate
+	}
+	if jc.SLRTemplate != nil {
+		da.SLRTemplate = *jc.SLRTemplate
+	}
+	if jc.STRTemplate != nil {
+		da.STRTemplate = *jc.STRTemplate
 	}
 	if jc.ForcedDisconnect != nil {
 		da.ForcedDisconnect = *jc.ForcedDisconnect
@@ -172,22 +173,26 @@ func (da *DiameterAgentCfg) AsMapInterface(separator string) map[string]any {
 		listeners[i] = item.AsMapInterface()
 	}
 	m := map[string]any{
-		utils.EnabledCfg:                 da.Enabled,
-		utils.ListenersCfg:               listeners,
-		utils.DictionariesPathCfg:        da.DictionariesPath,
-		utils.OriginHostCfg:              da.OriginHost,
-		utils.OriginRealmCfg:             da.OriginRealm,
-		utils.VendorIDCfg:                da.VendorID,
-		utils.ProductNameCfg:             da.ProductName,
-		utils.SyncedConnReqsCfg:          da.SyncedConnReqs,
-		utils.ASRTemplateCfg:             da.ASRTemplate,
-		utils.RARTemplateCfg:             da.RARTemplate,
-		utils.ForcedDisconnectCfg:        da.ForcedDisconnect,
-		utils.ConnHealthCheckIntervalCfg: da.ConnHealthCheckInterval.String(),
-		utils.StatSConnsCfg:              stripInternalConns(da.StatSConns),
-		utils.ThresholdSConnsCfg:         stripInternalConns(da.ThresholdSConns),
-		utils.ConnStatusStatQueueIDsCfg:  da.ConnStatusStatQueueIDs,
-		utils.ConnStatusThresholdIDsCfg:  da.ConnStatusThresholdIDs,
+		utils.EnabledCfg:                    da.Enabled,
+		utils.ListenersCfg:                  listeners,
+		utils.DictionariesPathCfg:           da.DictionariesPath,
+		utils.DictionariesAppendDefaultsCfg: da.DictionariesAppendDefaults,
+		utils.OriginHostCfg:                 da.OriginHost,
+		utils.OriginRealmCfg:                da.OriginRealm,
+		utils.VendorIDCfg:                   da.VendorID,
+		utils.ProductNameCfg:                da.ProductName,
+		utils.SyncedConnReqsCfg:             da.SyncedConnReqs,
+		utils.ASRTemplateCfg:                da.ASRTemplate,
+		utils.RARTemplateCfg:                da.RARTemplate,
+		utils.SNRTemplateCfg:                da.SNRTemplate,
+		utils.SLRTemplateCfg:                da.SLRTemplate,
+		utils.STRTemplateCfg:                da.STRTemplate,
+		utils.ForcedDisconnectCfg:           da.ForcedDisconnect,
+		utils.ConnHealthCheckIntervalCfg:    da.ConnHealthCheckInterval.String(),
+		utils.StatSConnsCfg:                 stripInternalConns(da.StatSConns),
+		utils.ThresholdSConnsCfg:            stripInternalConns(da.ThresholdSConns),
+		utils.ConnStatusStatQueueIDsCfg:     da.ConnStatusStatQueueIDs,
+		utils.ConnStatusThresholdIDsCfg:     da.ConnStatusThresholdIDs,
 	}
 
 	if da.CeApplications != nil {
@@ -218,26 +223,33 @@ func (da *DiameterAgentCfg) AsMapInterface(separator string) map[string]any {
 }
 
 // Clone returns a deep copy of DiameterAgentCfg
-func (da DiameterAgentCfg) Clone() *DiameterAgentCfg {
+func (da *DiameterAgentCfg) Clone() *DiameterAgentCfg {
+	if da == nil {
+		return nil
+	}
 	clone := &DiameterAgentCfg{
-		Enabled:                 da.Enabled,
-		Listeners:               slices.Clone(da.Listeners),
-		DictionariesPath:        da.DictionariesPath,
-		CeApplications:          slices.Clone(da.CeApplications),
-		SessionSConns:           slices.Clone(da.SessionSConns),
-		StatSConns:              slices.Clone(da.StatSConns),
-		ThresholdSConns:         slices.Clone(da.ThresholdSConns),
-		OriginHost:              da.OriginHost,
-		OriginRealm:             da.OriginRealm,
-		VendorID:                da.VendorID,
-		ProductName:             da.ProductName,
-		SyncedConnReqs:          da.SyncedConnReqs,
-		ASRTemplate:             da.ASRTemplate,
-		RARTemplate:             da.RARTemplate,
-		ForcedDisconnect:        da.ForcedDisconnect,
-		ConnStatusStatQueueIDs:  slices.Clone(da.ConnStatusStatQueueIDs),
-		ConnStatusThresholdIDs:  slices.Clone(da.ConnStatusThresholdIDs),
-		ConnHealthCheckInterval: da.ConnHealthCheckInterval,
+		Enabled:                    da.Enabled,
+		Listeners:                  slices.Clone(da.Listeners),
+		DictionariesPath:           da.DictionariesPath,
+		DictionariesAppendDefaults: da.DictionariesAppendDefaults,
+		CeApplications:             slices.Clone(da.CeApplications),
+		SessionSConns:              slices.Clone(da.SessionSConns),
+		StatSConns:                 slices.Clone(da.StatSConns),
+		ThresholdSConns:            slices.Clone(da.ThresholdSConns),
+		OriginHost:                 da.OriginHost,
+		OriginRealm:                da.OriginRealm,
+		VendorID:                   da.VendorID,
+		ProductName:                da.ProductName,
+		SyncedConnReqs:             da.SyncedConnReqs,
+		ASRTemplate:                da.ASRTemplate,
+		RARTemplate:                da.RARTemplate,
+		SNRTemplate:                da.SNRTemplate,
+		SLRTemplate:                da.SLRTemplate,
+		STRTemplate:                da.STRTemplate,
+		ForcedDisconnect:           da.ForcedDisconnect,
+		ConnStatusStatQueueIDs:     slices.Clone(da.ConnStatusStatQueueIDs),
+		ConnStatusThresholdIDs:     slices.Clone(da.ConnStatusThresholdIDs),
+		ConnHealthCheckInterval:    da.ConnHealthCheckInterval,
 	}
 	if da.RequestProcessors != nil {
 		clone.RequestProcessors = make([]*RequestProcessor, len(da.RequestProcessors))

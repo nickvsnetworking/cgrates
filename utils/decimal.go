@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package utils
 
 import (
@@ -64,24 +50,20 @@ func NewDecimalFromFloat64(f float64) *Decimal {
 }
 
 // NewDecimalFromUsage is a constructor for Decimal out of unit represents as string
-func NewDecimalFromUsage(u string) (d *Decimal, err error) {
+func NewDecimalFromUsage(u string) (*Decimal, error) {
 	switch {
-	//"ns", "us" (or "µs"), "ms", "s", "m", "h"
-	case strings.HasSuffix(u, NsSuffix), strings.HasSuffix(u, UsSuffix), strings.HasSuffix(u, µSuffix), strings.HasSuffix(u, MsSuffix),
-		strings.HasSuffix(u, SSuffix), strings.HasSuffix(u, MSuffix), strings.HasSuffix(u, HSuffix):
-		var tm time.Duration
-		if tm, err = time.ParseDuration(u); err != nil {
-			return
+	case strings.HasSuffix(u, "s"), strings.HasSuffix(u, "m"), strings.HasSuffix(u, "h"):
+		tm, err := time.ParseDuration(u)
+		if err != nil {
+			return nil, err
 		}
-		d = NewDecimal(int64(tm), 0)
-		return
+		return NewDecimal(int64(tm), 0), nil
 	default:
-		var i int64
-		if i, err = strconv.ParseInt(u, 10, 64); err != nil {
-			return
+		i, err := strconv.ParseInt(u, 10, 64)
+		if err != nil {
+			return nil, err
 		}
-		d = NewDecimal(i, 0)
-		return
+		return NewDecimal(i, 0), nil
 	}
 
 }

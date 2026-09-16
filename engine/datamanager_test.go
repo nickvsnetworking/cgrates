@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package engine
 
 import (
@@ -22,6 +8,7 @@ import (
 	"fmt"
 	"reflect"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 
@@ -618,6 +605,15 @@ func TestDMSetAccount(t *testing.T) {
 	if err := dm.SetAccount(acc); err != nil {
 		t.Error(err)
 	}
+	empty := &Account{ID: acc.ID, BalanceMap: map[string]Balances{}}
+	if err := db.SetAccountDrv(empty); err != nil {
+		t.Fatal(err)
+	}
+	if got, err := db.GetAccountDrv(acc.ID); err != nil {
+		t.Fatal(err)
+	} else if len(got.BalanceMap) != 0 {
+		t.Errorf("driver replacement BalanceMap = %#v, want empty", got.BalanceMap)
+	}
 	var dmnil *DataManager
 	if err = dmnil.SetAccount(acc); err == nil || err != utils.ErrNoDatabaseConn {
 		t.Error(err)
@@ -625,6 +621,93 @@ func TestDMSetAccount(t *testing.T) {
 	dm.dataDB = &DataDBMock{}
 	if err = dm.SetAccount(acc); err == nil || err != utils.ErrNotImplemented {
 		t.Error(err)
+	}
+}
+
+func TestDMSetAccountReplication(t *testing.T) {
+	oldCfg := config.CgrConfig()
+	cfg := config.NewDefaultCGRConfig()
+	cfg.DataDbCfg().Items[utils.MetaAccounts].Replicate = true
+	config.SetCgrConfig(cfg)
+	t.Cleanup(func() { config.SetCgrConfig(oldCfg) })
+
+	id := "cgrates.org:account"
+	stored := &Account{
+		ID: id,
+		BalanceMap: map[string]Balances{
+			utils.MetaMonetary: {
+				&Balance{Value: 10},
+			},
+		},
+	}
+	var reads int
+	var written *Account
+	db := &DataDBMock{
+		GetAccountDrvF: func(string) (*Account, error) {
+			reads++
+			return stored.Clone(), nil
+		},
+		SetAccountDrvF: func(acc *Account) error {
+			written = acc
+			return nil
+		},
+	}
+	dm := NewDataManager(db, cfg.CacheCfg(), nil)
+	dm.replicator.interval = time.Hour
+
+	for _, test := range []struct {
+		name       string
+		balanceMap map[string]Balances
+		expired    bool
+	}{
+		{name: "Empty", balanceMap: map[string]Balances{}},
+		{name: "Nil"},
+		{name: "ExpiredOnly", balanceMap: map[string]Balances{}, expired: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			reads = 0
+			written = nil
+			stored.BalanceMap[utils.MetaMonetary][0].ExpirationDate = time.Time{}
+			if test.expired {
+				stored.BalanceMap[utils.MetaMonetary][0].ExpirationDate = time.Now().Add(-time.Hour)
+			}
+			incoming := &Account{
+				ID:             id,
+				BalanceMap:     test.balanceMap,
+				UnitCounters:   UnitCounters{},
+				ActionTriggers: ActionTriggers{},
+				AllowNegative:  true,
+				Disabled:       true,
+			}
+			if err := dm.SetAccount(incoming); err != nil {
+				t.Fatal(err)
+			}
+			if reads != 1 {
+				t.Errorf("GetAccountDrv called %d times, want 1", reads)
+			}
+			wantBalances := stored.BalanceMap
+			if test.expired {
+				wantBalances = incoming.BalanceMap
+			}
+			if written == nil || !reflect.DeepEqual(written.BalanceMap, wantBalances) ||
+				!reflect.DeepEqual(written.UnitCounters, incoming.UnitCounters) ||
+				!reflect.DeepEqual(written.ActionTriggers, incoming.ActionTriggers) ||
+				written.AllowNegative != incoming.AllowNegative || written.Disabled != incoming.Disabled {
+				t.Errorf("SetAccountDrv received %#v", written)
+			}
+			pending := dm.replicator.pending[replicationKey(utils.AccountPrefix, id,
+				utils.ReplicatorSv1SetAccount)]
+			if pending == nil {
+				t.Fatal("pending Account replication not found")
+			}
+			args, ok := pending.args.(*AccountWithAPIOpts)
+			if !ok {
+				t.Fatalf("replication args have type %T", pending.args)
+			}
+			if args.Account != written {
+				t.Error("stored and replicated Accounts differ")
+			}
+		})
 	}
 }
 
@@ -3081,6 +3164,60 @@ func TestDMSetLoadIDs(t *testing.T) {
 	}
 }
 
+func TestDMSetLoadIDsReplicationFailure(t *testing.T) {
+	cfg := config.NewDefaultCGRConfig()
+	oldCfg := config.CgrConfig()
+	oldCache := Cache
+	oldConnMgr := connMgr
+	oldLogger := utils.Logger
+	t.Cleanup(func() {
+		config.SetCgrConfig(oldCfg)
+		Cache = oldCache
+		SetConnManager(oldConnMgr)
+		utils.Logger = oldLogger
+	})
+
+	connID := utils.ConcatenatedKey(utils.MetaInternal, utils.ReplicatorSv1)
+	cfg.DataDbCfg().RplConns = []string{connID}
+	cfg.DataDbCfg().Items = map[string]*config.ItemOpt{
+		utils.CacheLoadIDs: {Limit: 3, Replicate: true},
+	}
+	config.SetCgrConfig(cfg)
+	Cache = NewCacheS(cfg, nil, nil)
+
+	failingConn := make(chan birpc.ClientConnector, 1)
+	failingConn <- &ccMock{
+		calls: map[string]func(ctx *context.Context, args any, reply any) error{
+			utils.ReplicatorSv1SetLoadIDs: func(ctx *context.Context, args, reply any) error {
+				return errors.New("replication failed")
+			},
+		},
+	}
+	db, err := NewInternalDB(nil, nil, true, nil, cfg.DataDbCfg().Items)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cm := NewConnManager(cfg, map[string]chan birpc.ClientConnector{connID: failingConn})
+	dm := NewDataManager(db, cfg.CacheCfg(), cm)
+	logger := &warningLogger{}
+	utils.Logger = logger
+
+	loadIDs := map[string]int64{"load3": 21}
+	if err := dm.SetLoadIDs(loadIDs); err != nil {
+		t.Fatal(err)
+	}
+	if len(logger.warnings) != 1 || !strings.Contains(logger.warnings[0], "failed to replicate load IDs") {
+		t.Fatalf("expected a replication warning, got %v", logger.warnings)
+	}
+	stored, err := dm.DataDB().GetItemLoadIDsDrv("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(stored, loadIDs) {
+		t.Errorf("locally stored load IDs = %#v, want %#v", stored, loadIDs)
+	}
+}
+
 func TestGetItemLoadIDsRemote(t *testing.T) {
 	cfg := config.NewDefaultCGRConfig()
 	tmpDm := dm
@@ -4076,8 +4213,40 @@ func TestCacheDataFromDB(t *testing.T) {
 	if err := dm.CacheDataFromDB(utils.ResourcesPrefix, []string{utils.ConcatenatedKey(rs.Tenant, rs.ID)}, false); err != nil {
 		t.Error(err)
 	}
-	if err := dm.CacheDataFromDB(utils.ResourceFilterIndexes, []string{"*resources:*string:~*req.RequestType:*rated"}, false); err != nil {
+	if err := dm.CacheDataFromDB(utils.IPProfilesPrefix, []string{utils.ConcatenatedKey(rs.Tenant, rs.ID)}, false); err != nil {
 		t.Error(err)
+	}
+	if err := dm.CacheDataFromDB(utils.IPAllocationsPrefix, []string{utils.ConcatenatedKey(rs.Tenant, rs.ID)}, false); err != nil {
+		t.Error(err)
+	}
+	if err := dm.CacheDataFromDB(utils.RankingsProfilePrefix, []string{utils.ConcatenatedKey(rs.Tenant, rs.ID)}, false); err != nil {
+		t.Error(err)
+	}
+	if err := dm.CacheDataFromDB(utils.RankingPrefix, []string{utils.ConcatenatedKey(rs.Tenant, rs.ID)}, false); err != nil {
+		t.Error(err)
+	}
+	if err := dm.CacheDataFromDB(utils.TrendsProfilePrefix, []string{utils.ConcatenatedKey(rs.Tenant, rs.ID)}, false); err != nil {
+		t.Error(err)
+	}
+	if err := dm.CacheDataFromDB(utils.TrendPrefix, []string{utils.ConcatenatedKey(rs.Tenant, rs.ID)}, false); err != nil {
+		t.Error(err)
+	}
+	if err := dm.CacheDataFromDB(utils.ResourceFilterIndexes, []string{"cgrates.org:*string:~*req.RequestType:*rated"}, false); err != nil {
+		t.Error(err)
+	}
+	if err := dm.SetIndexes(utils.CacheResourceFilterIndexes, "cgrates.org",
+		map[string]utils.StringSet{
+			"*exists:*req.Account": {"RES_GRP1": {}},
+		}, true, utils.NonTransactional); err != nil {
+		t.Error(err)
+	}
+	if err := dm.CacheDataFromDB(utils.ResourceFilterIndexes, []string{"cgrates.org:*exists:*req.Account"}, false); err != nil {
+		t.Error(err)
+	}
+	if val, exists := Cache.Get(utils.CacheResourceFilterIndexes, "cgrates.org:*exists:*req.Account"); !exists {
+		t.Error("exists index not cached after CacheDataFromDB")
+	} else if ids, ok := val.(utils.StringSet); !ok || !ids.Has("RES_GRP1") {
+		t.Errorf("expected RES_GRP1 in cached index, got %v", val)
 	}
 	sqPrf := &StatQueueProfile{
 		Tenant:    "cgrates.org",
@@ -4323,6 +4492,48 @@ func TestCacheDataFromDBErr(t *testing.T) {
 
 	if err := dm.CacheDataFromDB(utils.ThresholdProfilePrefix, []string{utils.ConcatenatedKey(thdPrf.Tenant, thdPrf.ID)}, false); err == nil {
 		t.Error(err)
+	}
+	if err := dm.CacheDataFromDB(utils.AttributeFilterIndexes, []string{utils.ConcatenatedKey(thdPrf.Tenant, thdPrf.ID)}, false); err == nil {
+		t.Error(err)
+	}
+	if err := dm.CacheDataFromDB(utils.ResourceFilterIndexes, []string{utils.ConcatenatedKey(thdPrf.Tenant, thdPrf.ID)}, false); err == nil {
+		t.Error(err)
+	}
+	if err := dm.CacheDataFromDB(utils.StatFilterIndexes, []string{utils.ConcatenatedKey(thdPrf.Tenant, thdPrf.ID)}, false); err == nil {
+		t.Error(err)
+	}
+	if err := dm.CacheDataFromDB(utils.ThresholdFilterIndexes, []string{utils.ConcatenatedKey(thdPrf.Tenant, thdPrf.ID)}, false); err == nil {
+		t.Error(err)
+	}
+	if err := dm.CacheDataFromDB(utils.RouteFilterIndexes, []string{utils.ConcatenatedKey(thdPrf.Tenant, thdPrf.ID)}, false); err == nil {
+		t.Error(err)
+	}
+	if err := dm.CacheDataFromDB(utils.ChargerFilterIndexes, []string{utils.ConcatenatedKey(thdPrf.Tenant, thdPrf.ID)}, false); err == nil {
+		t.Error(err)
+	}
+	if err := dm.CacheDataFromDB(utils.DispatcherFilterIndexes, []string{utils.ConcatenatedKey(thdPrf.Tenant, thdPrf.ID)}, false); err == nil {
+		t.Error(err)
+	}
+}
+func TestCacheDataFromDBNil(t *testing.T) {
+	cfg := config.NewDefaultCGRConfig()
+	tmpDm := dm
+	tmp := Cache
+	defer func() {
+		config.SetCgrConfig(config.NewDefaultCGRConfig())
+		Cache = tmp
+		SetDataStorage(tmpDm)
+	}()
+	Cache.Clear(nil)
+	db, dErr := NewInternalDB(nil, nil, true, nil, cfg.DataDbCfg().Items)
+	if dErr != nil {
+		t.Error(dErr)
+	}
+	dm := NewDataManager(db, cfg.CacheCfg(), nil)
+	dm = nil
+	expectedErr := "NO_DATABASE_CONNECTION"
+	if err := dm.CacheDataFromDB("INVALID", nil, false); err == nil || err.Error() != expectedErr {
+		t.Errorf("Expected %v, recieved %v", expectedErr, err)
 	}
 }
 

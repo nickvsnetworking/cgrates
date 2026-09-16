@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package config
 
@@ -120,8 +105,6 @@ func (mg *MigratorCgrCfg) AsMapInterface() (initialMP map[string]any) {
 		utils.RedisClusterSyncCfg:        mg.OutDataDBOpts.RedisClusterSync.String(),
 		utils.RedisClusterOnDownDelayCfg: mg.OutDataDBOpts.RedisClusterOndownDelay.String(),
 		utils.RedisConnectTimeoutCfg:     mg.OutDataDBOpts.RedisConnectTimeout.String(),
-		utils.RedisReadTimeoutCfg:        mg.OutDataDBOpts.RedisReadTimeout.String(),
-		utils.RedisWriteTimeoutCfg:       mg.OutDataDBOpts.RedisWriteTimeout.String(),
 		utils.RedisPoolPipelineWindowCfg: mg.OutDataDBOpts.RedisPoolPipelineWindow.String(),
 		utils.RedisPoolPipelineLimitCfg:  mg.OutDataDBOpts.RedisPoolPipelineLimit,
 		utils.RedisTLS:                   mg.OutDataDBOpts.RedisTLS,
@@ -162,7 +145,10 @@ func (mg *MigratorCgrCfg) AsMapInterface() (initialMP map[string]any) {
 }
 
 // Clone returns a deep copy of MigratorCgrCfg
-func (mg MigratorCgrCfg) Clone() (cln *MigratorCgrCfg) {
+func (mg *MigratorCgrCfg) Clone() (cln *MigratorCgrCfg) {
+	if mg == nil {
+		return nil
+	}
 	cln = &MigratorCgrCfg{
 		OutDataDBType:     mg.OutDataDBType,
 		OutDataDBHost:     mg.OutDataDBHost,

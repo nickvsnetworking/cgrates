@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package agents
 
@@ -25,10 +10,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cgrates/cgrates/config"
 	"github.com/cgrates/cgrates/utils"
 	"github.com/cgrates/go-diameter/diam"
 	"github.com/cgrates/go-diameter/diam/avp"
 	"github.com/cgrates/go-diameter/diam/datatype"
+	"github.com/cgrates/go-diameter/diam/dict"
 	"github.com/cgrates/go-diameter/diam/sm"
 )
 
@@ -37,11 +24,23 @@ var dictOnce sync.Once
 func NewDiameterClient(addr, originHost, originRealm string, vendorId int, productName string,
 	firmwareRev int, dictsDir string, network string) (dc *DiameterClient, err error) {
 	cfg := &sm.Settings{
+		Dict:             dict.Default,
 		OriginHost:       datatype.DiameterIdentity(originHost),
 		OriginRealm:      datatype.DiameterIdentity(originRealm),
 		VendorID:         datatype.Unsigned32(vendorId),
 		ProductName:      datatype.UTF8String(productName),
 		FirmwareRevision: datatype.Unsigned32(firmwareRev),
+	}
+	if len(dictsDir) != 0 {
+		if !config.CgrConfig().DiameterAgentCfg().DictionariesAppendDefaults {
+			if cfg.Dict, err = dict.NewParser(); err != nil {
+				return nil, err
+			}
+		}
+		dictOnce.Do(func() { err = loadDictionaries(cfg.Dict, dictsDir, "DiameterClient") })
+		if err != nil {
+			return nil, err
+		}
 	}
 	interfaces, err := net.Interfaces()
 	if err != nil {
@@ -75,12 +74,6 @@ func NewDiameterClient(addr, originHost, originRealm string, vendorId int, produ
 			// Advertise support for credit control application
 			diam.NewAVP(avp.AuthApplicationID, avp.Mbit, 0, datatype.Unsigned32(4)), // RFC 4006
 		},
-	}
-	if len(dictsDir) != 0 {
-		dictOnce.Do(func() { err = loadDictionaries(dictsDir, "DiameterClient") })
-		if err != nil {
-			return nil, err
-		}
 	}
 	conn, err := cli.DialNetwork(network, addr)
 	if err != nil {

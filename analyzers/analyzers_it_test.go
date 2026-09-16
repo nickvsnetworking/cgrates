@@ -1,23 +1,8 @@
 //go:build integration
 // +build integration
 
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package analyzers
 
@@ -56,6 +41,9 @@ var (
 		testAnalyzerSV1Search,
 		testAnalyzerSV1Search2,
 		testAnalyzerSV1SearchWithContentFilters,
+		testAnalyzerSV1SearchWithLimit,
+		testAnalyzerSV1SearchWithOffset,
+		testAnalyzerSV1SearchWithLimitAndOffsetZero,
 		testAnalyzerSV1BirPCSession,
 		testAnalyzerSKillEngine,
 	}
@@ -239,6 +227,74 @@ func testAnalyzerSV1SearchWithContentFilters(t *testing.T) {
 		t.Error(err)
 	} else if len(result) != 1 {
 		t.Errorf("Unexpected result: %s", utils.ToJSON(result))
+	}
+}
+
+func testAnalyzerSV1SearchWithLimit(t *testing.T) {
+	var resultAll []map[string]any
+	if err := anzRPC.Call(context.Background(), utils.AnalyzerSv1StringQuery, &QueryArgs{
+		HeaderFilters: `+RequestEncoding:\*json`,
+	}, &resultAll); err != nil {
+		t.Fatal(err)
+	}
+	totalCount := len(resultAll)
+	if totalCount < 2 {
+		t.Skipf("Need at least 2 results to test Limit, got %d", totalCount)
+	}
+
+	var result []map[string]any
+	if err := anzRPC.Call(context.Background(), utils.AnalyzerSv1StringQuery, &QueryArgs{
+		HeaderFilters: `+RequestEncoding:\*json`,
+		Limit:         1,
+	}, &result); err != nil {
+		t.Fatal(err)
+	} else if len(result) != 1 {
+		t.Errorf("Expected 1 result with Limit=1, received: %d", len(result))
+	}
+}
+
+func testAnalyzerSV1SearchWithOffset(t *testing.T) {
+	var resultAll []map[string]any
+	if err := anzRPC.Call(context.Background(), utils.AnalyzerSv1StringQuery, &QueryArgs{
+		HeaderFilters: `+RequestEncoding:\*json`,
+	}, &resultAll); err != nil {
+		t.Fatal(err)
+	}
+	totalCount := len(resultAll)
+	if totalCount < 2 {
+		t.Skipf("Need at least 2 results to test Offset, got %d", totalCount)
+	}
+
+	var result []map[string]any
+	if err := anzRPC.Call(context.Background(), utils.AnalyzerSv1StringQuery, &QueryArgs{
+		HeaderFilters: `+RequestEncoding:\*json`,
+		Limit:         totalCount,
+		Offset:        1,
+	}, &result); err != nil {
+		t.Fatal(err)
+	} else if len(result) != totalCount-1 {
+		t.Errorf("Expected %d results with Offset=1, received: %d", totalCount-1, len(result))
+	}
+}
+
+func testAnalyzerSV1SearchWithLimitAndOffsetZero(t *testing.T) {
+	var resultAll []map[string]any
+	if err := anzRPC.Call(context.Background(), utils.AnalyzerSv1StringQuery, &QueryArgs{
+		HeaderFilters: `+RequestEncoding:\*json`,
+	}, &resultAll); err != nil {
+		t.Fatal(err)
+	}
+	totalCount := len(resultAll)
+
+	var result []map[string]any
+	if err := anzRPC.Call(context.Background(), utils.AnalyzerSv1StringQuery, &QueryArgs{
+		HeaderFilters: `+RequestEncoding:\*json`,
+		Limit:         0,
+		Offset:        0,
+	}, &result); err != nil {
+		t.Fatal(err)
+	} else if len(result) != totalCount {
+		t.Errorf("Expected %d results with Limit=0 Offset=0, received: %d", totalCount, len(result))
 	}
 }
 

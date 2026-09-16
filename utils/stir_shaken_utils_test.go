@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package utils
 
@@ -120,11 +105,12 @@ func TestGetReaderFromPathError(t *testing.T) {
 
 func TestGetReaderFromPath(t *testing.T) {
 	tests := []struct {
-		name       string
-		path       string
-		timeout    time.Duration
-		expectErr  bool
-		expectData string
+		name           string
+		path           string
+		timeout        time.Duration
+		expectErr      bool
+		expectData     string
+		expectedString string
 	}{
 		{
 			name:       "Valid file path",
@@ -151,6 +137,13 @@ func TestGetReaderFromPath(t *testing.T) {
 			timeout:   1 * time.Second,
 			expectErr: true,
 		},
+		{
+			name:           "HTTP URL returns error ",
+			path:           "https://123",
+			timeout:        1 * time.Second,
+			expectErr:      true,
+			expectedString: `Get "https://123": dial tcp: lookup 123: no such host"`,
+		},
 	}
 
 	testFileName := "testfile.txt"
@@ -171,15 +164,20 @@ func TestGetReaderFromPath(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if tt.path == "http://cgrates.com" {
+			switch tt.path {
+			case "http://cgrates.com":
 				tt.path = ts.URL
-			} else if tt.path == "http://cgrates.com/non200" {
+			case "http://cgrates.com/non200":
 				tt.path = ts.URL + "/non200"
 			}
 
 			reader, err := GetReaderFromPath(tt.path, tt.timeout)
 
 			if (err != nil) != tt.expectErr {
+
+				if err.Error() != tt.expectedString {
+					t.Errorf("Wanted <%v> got <%v> ", tt.expectedString, err)
+				}
 				t.Errorf("expected error: %v, got: %v", tt.expectErr, err)
 				return
 			}

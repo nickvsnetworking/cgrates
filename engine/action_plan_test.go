@@ -1,25 +1,12 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package engine
 
 import (
 	"reflect"
 	"sort"
+	"strconv"
 	"testing"
 	"time"
 
@@ -106,6 +93,12 @@ func TestActionPlanClone(t *testing.T) {
 		},
 	}
 	clned := at1.Clone()
+	if !reflect.DeepEqual(at1, clned) {
+		t.Errorf("Expecting: %+v,\n received: %+v", at1, clned)
+	}
+
+	at1 = nil
+	clned = at1.Clone()
 	if !reflect.DeepEqual(at1, clned) {
 		t.Errorf("Expecting: %+v,\n received: %+v", at1, clned)
 	}
@@ -298,21 +291,21 @@ func TestActionTimingExErr(t *testing.T) {
 		},
 	}
 	fltrs := NewFilterS(cfg, nil, dm)
-	if err := at.Execute(nil, ""); err == nil || err != utils.ErrPartiallyExecuted {
+	if err := at.Execute(nil, "", nil); err == nil || err != utils.ErrPartiallyExecuted {
 		t.Error(err)
 	}
 	at.accountIDs = utils.StringMap{"cgrates.org:zeroNegative": true}
 	at.actions[0].ActionType = utils.MetaResetStatQueue
-	if err := at.Execute(nil, ""); err == nil || err != utils.ErrPartiallyExecuted {
+	if err := at.Execute(nil, "", nil); err == nil || err != utils.ErrPartiallyExecuted {
 		t.Error(err)
 	}
 	Cache.Set(utils.CacheFilters, "cgrates.org:*string:~*req.BalanceMap.*monetary[0].ID:*default", nil, []string{}, true, utils.NonTransactional)
 	at.actions[0].Filters = []string{"*string:~*req.BalanceMap.*monetary[0].ID:*default"}
-	if err := at.Execute(fltrs, ""); err != nil {
+	if err := at.Execute(fltrs, "", nil); err != nil {
 		t.Error(err)
 	}
 	SetDataStorage(nil)
-	if err := at.Execute(nil, ""); err != nil {
+	if err := at.Execute(nil, "", nil); err != nil {
 		t.Error(err)
 	}
 }
@@ -330,6 +323,19 @@ func TestActionTimingGetNextStartTimesMonthlyEstimated(t *testing.T) {
 		at       *ActionTiming
 		expected time.Time
 	}{
+		{
+			name: "*recurring",
+			t1:   time.Date(2020, 2, 7, 14, 25, 0, 0, time.UTC),
+			at: &ActionTiming{
+				Timing: &RateInterval{
+					Timing: &RITiming{
+						ID:        "*recurring+720h",
+						StartTime: "*recurring+720h",
+					},
+				},
+			},
+			expected: time.Date(2020, 3, 8, 14, 25, 0, 0, time.UTC),
+		},
 		{
 			name: "February 7 to February 29",
 			t1:   time.Date(2020, 2, 7, 14, 25, 0, 0, time.UTC),
@@ -719,6 +725,9 @@ func TestVerifyFormat(t *testing.T) {
 		{"119911", false},
 		{"00/01/03", false},
 		{"t1:t2:t3", false},
+		{"12::56", false},
+		{"12:34:", false},
+		{"+12:34:56", true},
 	}
 
 	for _, tt := range tests {
@@ -879,6 +888,223 @@ func TestActionTimingGetNextStartTime2(t *testing.T) {
 			if !cachedResult.Equal(result) {
 				t.Errorf("Cached result differs: got %v, want %v",
 					cachedResult, result)
+			}
+		})
+	}
+}
+
+func TestAttrActionPlanGetRITiming(t *testing.T) {
+
+	cfg := config.NewDefaultCGRConfig()
+	db, err := NewInternalDB(nil, nil, true, nil, cfg.DataDbCfg().Items)
+	if err != nil {
+		t.Error(err)
+	}
+	dm := NewDataManager(db, cfg.CacheCfg(), nil)
+	tp := &utils.TPTiming{
+		ID:        "TM_MORNING",
+		Years:     utils.Years{2025},
+		Months:    utils.Months{1},
+		MonthDays: utils.MonthDays{1},
+		WeekDays:  utils.WeekDays{1},
+		StartTime: "00:00:00",
+		EndTime:   "00:00:01",
+	}
+	dm.SetTiming(tp)
+	var dm2 *DataManager
+
+	tests := []struct {
+		name    string
+		attr    *AttrActionPlan
+		dm      *DataManager
+		want    *RITiming
+		wantErr string
+	}{
+		{
+			name: "NO_DATABASE_CONNECTION error",
+			attr: &AttrActionPlan{
+				ActionsId: "actionId1",
+				TimingID:  "TM_MORNING",
+				Years:     "2026",
+				Months:    "2",
+				MonthDays: "2",
+				WeekDays:  "2",
+				Time:      "00:00:00",
+			},
+			dm:      dm2,
+			want:    nil,
+			wantErr: "NO_DATABASE_CONNECTION",
+		},
+		{
+			name: "Empty fields",
+			dm:   dm,
+			attr: &AttrActionPlan{},
+			want: &RITiming{
+				ID:         "",
+				Years:      nil,
+				Months:     nil,
+				MonthDays:  nil,
+				WeekDays:   nil,
+				StartTime:  "",
+				EndTime:    "",
+				cronString: "",
+				tag:        "",
+			},
+		},
+		{
+			name: "Empty TimingID",
+			attr: &AttrActionPlan{
+				ActionsId: "actionId1",
+				TimingID:  utils.EmptyString,
+				Years:     "2025",
+				Months:    "1",
+				MonthDays: "1",
+				WeekDays:  "1",
+				Time:      "12:00:00",
+			},
+			dm: nil,
+			want: &RITiming{
+				ID:         utils.EmptyString,
+				Years:      utils.Years{2025},
+				Months:     utils.Months{time.January},
+				MonthDays:  utils.MonthDays{1},
+				WeekDays:   utils.WeekDays{time.Monday},
+				StartTime:  "12:00:00",
+				EndTime:    "",
+				cronString: "",
+				tag:        "",
+			},
+		},
+		{
+			name: "TimingID found",
+			attr: &AttrActionPlan{
+				ActionsId: "actionId1",
+				TimingID:  "TM_MORNING",
+				Years:     "2026",
+				Months:    "2",
+				MonthDays: "2",
+				WeekDays:  "2",
+				Time:      "00:00:00",
+			},
+			dm: dm,
+			want: &RITiming{
+				ID:         "TM_MORNING",
+				Years:      utils.Years{2025, 2026},
+				Months:     utils.Months{1, 2},
+				MonthDays:  utils.MonthDays{1, 2},
+				WeekDays:   utils.WeekDays{1, 2},
+				StartTime:  "00:00:00",
+				EndTime:    "00:00:01",
+				cronString: "",
+				tag:        ""},
+		},
+		{
+			name: "UNSUPPORTED_FORMAT",
+			attr: &AttrActionPlan{
+				ActionsId: "actionId1",
+				TimingID:  "Timing1",
+				Years:     "2025",
+				Months:    "1",
+				MonthDays: "1",
+				WeekDays:  "1",
+				Time:      "120000",
+			},
+			dm: dm,
+			want: &RITiming{
+				ID:         "Timing1",
+				Years:      utils.Years{2025},
+				Months:     utils.Months{time.January},
+				MonthDays:  utils.MonthDays{1},
+				WeekDays:   utils.WeekDays{time.Monday},
+				StartTime:  "",
+				EndTime:    "",
+				cronString: "",
+				tag:        "",
+			},
+			wantErr: "UNSUPPORTED_FORMAT:120000",
+		},
+		{
+			name: "DataManager with no timing set",
+			attr: &AttrActionPlan{
+				ActionsId: "actionId1",
+				TimingID:  "Timing1",
+				Years:     "2025",
+				Months:    "1",
+				MonthDays: "1",
+				WeekDays:  "1",
+				Time:      "12:00:00",
+			},
+			dm: NewDataManager(db, cfg.CacheCfg(), nil),
+			want: &RITiming{
+				ID:         "Timing1",
+				Years:      utils.Years{2025},
+				Months:     utils.Months{time.January},
+				MonthDays:  utils.MonthDays{1},
+				WeekDays:   utils.WeekDays{time.Monday},
+				StartTime:  "12:00:00",
+				EndTime:    "",
+				cronString: "",
+				tag:        "",
+			},
+		},
+		{
+			name: "Default timing: *hourly",
+			attr: &AttrActionPlan{
+				ActionsId: "actionId1",
+				TimingID:  "Timing1",
+				Years:     "2025",
+				Months:    "1",
+				MonthDays: "1",
+				WeekDays:  "1",
+				Time:      utils.MetaHourly,
+			},
+			dm: NewDataManager(db, cfg.CacheCfg(), nil),
+			want: &RITiming{
+				ID:         "*hourly",
+				Years:      utils.Years{},
+				Months:     utils.Months{},
+				MonthDays:  utils.MonthDays{},
+				WeekDays:   utils.WeekDays{},
+				StartTime:  utils.ConcatenatedKey(utils.Meta, strconv.Itoa(time.Now().Minute()), strconv.Itoa(time.Now().Second())),
+				EndTime:    "",
+				cronString: "",
+				tag:        "",
+			},
+		},
+		{
+			name: "Empty DataManager",
+			attr: &AttrActionPlan{
+				ActionsId: "actionId1",
+				TimingID:  "Timing1",
+				Years:     "2025",
+				Months:    "1",
+				MonthDays: "1",
+				WeekDays:  "1",
+				Time:      "12:00:00",
+			},
+			dm: &DataManager{},
+			want: &RITiming{
+				ID:         "Timing1",
+				Years:      utils.Years{2025},
+				Months:     utils.Months{time.January},
+				MonthDays:  utils.MonthDays{1},
+				WeekDays:   utils.WeekDays{time.Monday},
+				StartTime:  "12:00:00",
+				EndTime:    "",
+				cronString: "",
+				tag:        "",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := tt.attr.GetRITiming(tt.dm)
+			if err != nil && err.Error() != tt.wantErr {
+				t.Errorf("Expected %v recieved %v", tt.wantErr, err)
+			}
+
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("GetRITiming() = %#+v, want %#+v", got, tt.want)
 			}
 		})
 	}

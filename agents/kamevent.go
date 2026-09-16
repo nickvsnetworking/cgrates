@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package agents
 
@@ -425,40 +410,54 @@ func (krply *KamReply) String() string {
 	return utils.ToJSON(krply)
 }
 
-type KamDlgReply struct {
-	Event        string
-	Jsonrpl_body *kamJsonDlgBody
+type kamDlgReply struct {
+	Event string
+	Body  *kamJsonDlgBody `json:"jsonrpl_body"`
 }
 
 type kamJsonDlgBody struct {
-	Id      int
-	Jsonrpc string
-	Result  []*kamDlgInfo
+	ID      int           `json:"id"`
+	Jsonrpc string        `json:"jsonrpc"`
+	Result  []*kamDlgInfo `json:"result"`
 }
 
 type kamDlgInfo struct {
-	CallId    string `json:"call-id"`
-	Caller    *kamCallerDlg
-	Variables []struct {
-		CgrOriginID   string `json:"cgrOriginID,omitempty"`
-		CgrOriginHost string `json:"cgrOriginHost,omitempty"`
-	} `json:"variables"`
+	CallID    string        `json:"call-id"`
+	Caller    *kamCallerDlg `json:"caller"`    // d.list only
+	FromTag   string        `json:"from_tag"`  // d.briefing only
+	Variables []kamDlgVar   `json:"variables"` // d.list only
 }
 
 type kamCallerDlg struct {
-	Tag string
+	Tag string `json:"tag"`
 }
 
-// NewKamDlgReply parses bytes received over the wire from Kamailio into KamDlgReply
-func NewKamDlgReply(kamEvData []byte) (rpl KamDlgReply, err error) {
-	if err = json.Unmarshal(kamEvData, &rpl); err != nil {
-		return
+type kamDlgVar struct {
+	CgrOriginID   string `json:"cgrOriginID,omitempty"`
+	CgrOriginHost string `json:"cgrOriginHost,omitempty"`
+}
+
+func (d *kamDlgInfo) callerTag() string {
+	if d.Caller != nil {
+		return d.Caller.Tag
 	}
-	return
+	return d.FromTag
 }
 
-func (kdr *KamDlgReply) String() string {
-	return utils.ToJSON(kdr)
+func (d *kamDlgInfo) sessionID(defaultHost string) *sessions.SessionID {
+	host, id := defaultHost, d.CallID
+	if tag := d.callerTag(); tag != "" {
+		id += ";" + tag
+	}
+	for _, v := range d.Variables {
+		if v.CgrOriginHost != "" {
+			host = v.CgrOriginHost
+		}
+		if v.CgrOriginID != "" {
+			id = v.CgrOriginID
+		}
+	}
+	return &sessions.SessionID{OriginHost: host, OriginID: id}
 }
 
 // GetOptions returns the posible options

@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package services
 
@@ -82,6 +67,12 @@ func (smg *SessionService) Start() error {
 	smg.sm = sessions.NewSessionS(smg.cfg, datadb, smg.connMgr)
 	smg.stopChan = make(chan struct{})
 
+	// Pass internal connection
+	srv, err := engine.NewService(v1.NewSessionSv1(smg.sm))
+	if err != nil {
+		return err
+	}
+	smg.sm.PopulateCtx(context.WithClient(context.TODO(), srv))
 	// Restore previuos sessions backup and start backup looping
 	if smg.cfg.SessionSCfg().BackupInterval != 0 {
 		if err := smg.sm.RestoreAndBackupSessions(smg.stopChan); err != nil {
@@ -91,13 +82,7 @@ func (smg *SessionService) Start() error {
 
 	//start sync session in a separate gorutine
 	go smg.sm.SyncSessions(smg.stopChan)
-	// Pass internal connection
-	srv, err := engine.NewService(v1.NewSessionSv1(smg.sm))
-	if err != nil {
-		return err
-	}
 	smg.connChan <- smg.anz.GetInternalCodec(srv, utils.SessionS)
-	smg.sm.PopulateCtx(context.WithClient(context.TODO(), srv))
 	if !smg.cfg.DispatcherSCfg().Enabled {
 		smg.server.RpcRegister(srv)
 

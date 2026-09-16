@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package engine
 
@@ -1600,4 +1585,19 @@ func (iDB *InternalDB) RewriteStorDB() (err error) {
 // BackupStorDB will momentarely stop any dumping and rewriting until all dump folder is backed up in folder path backupFolderPath, making zip true will create a zip file in the path instead
 func (iDB *InternalDB) BackupStorDB(backupFolderPath string, zip bool) (err error) {
 	return iDB.db.BackupDumpFolder(backupFolderPath, zip)
+}
+
+// RestoreStorDB will attempt to restore the internal DB from
+// the latest backup in the specified backupPath. If backupPath is not specified, it will be
+// taken from the default's backup path.
+// Any data that was dumped from internal DB will be cleared before restoring from backup
+func (iDB *InternalDB) RestoreStorDB(backupFolderPath string) (err error) {
+	return iDB.db.Restore(backupFolderPath)
+}
+
+// SnapshotStorDB will take the BackupFolderPath (or default backup path if empty) to backup the
+// live dump folder taking zip as parameter to zip the backup or not, after which it cleares
+// the live dump folder and creates new dump files out of the live internal DB data
+func (iDB *InternalDB) SnapshotStorDB(backupFolderPath string, zip bool) (err error) {
+	return iDB.db.Snapshot(backupFolderPath, zip)
 }

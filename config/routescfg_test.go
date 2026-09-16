@@ -1,20 +1,6 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
 package config
 
 import (
@@ -204,5 +190,47 @@ func TestRouteSCfgClone(t *testing.T) {
 	}
 	if (*rcv.SuffixIndexedFields)[0] = ""; (*ban.SuffixIndexedFields)[0] != "*req.index1" {
 		t.Errorf("Expected clone to not modify the cloned")
+	}
+
+	ban = nil
+	rcv = ban.Clone()
+	if !reflect.DeepEqual(ban, rcv) {
+		t.Errorf("Expected: %+v\nReceived: %+v", utils.ToJSON(ban), utils.ToJSON(rcv))
+	}
+}
+
+func TestRoutesOptsClone(t *testing.T) {
+	tests := []struct {
+		name       string
+		routesOpts *RoutesOpts
+	}{
+		{
+			name: "Complete RoutesOpts",
+			routesOpts: &RoutesOpts{
+				Context:      utils.MetaRoutes,
+				IgnoreErrors: false,
+				MaxCost:      utils.IntPointer(3),
+				Limit:        utils.IntPointer(3),
+				Offset:       utils.IntPointer(3),
+				ProfileCount: utils.IntPointer(3),
+			},
+		},
+		{
+			name:       "Nil RoutesOpts",
+			routesOpts: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := tt.routesOpts.Clone()
+
+			if !reflect.DeepEqual(result, tt.routesOpts) {
+				t.Errorf("Clone() = %v, want %v", result, tt.routesOpts)
+			}
+
+			if result != nil && result == tt.routesOpts {
+				t.Errorf("Clone returned the same instance, expected a new instance")
+			}
+		})
 	}
 }

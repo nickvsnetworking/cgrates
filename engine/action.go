@@ -1,20 +1,5 @@
-/*
-Real-time Online/Offline Charging System (OCS) for Telecom & ISP environments
-Copyright (C) ITsysCOM GmbH
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU Affero General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU Affero General Public License for more details.
-
-You should have received a copy of the GNU Affero General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>
-*/
+// Copyright ITsysCOM GmbH
+// SPDX-License-Identifier: AGPL-3.0-or-later
 
 package engine
 
@@ -230,6 +215,7 @@ func init() {
 	actionFuncMap[utils.MetaDynamicTrend] = dynamicTrend
 	actionFuncMap[utils.MetaDynamicResource] = dynamicResource
 	actionFuncMap[utils.MetaDynamicActionTrigger] = dynamicActionTrigger
+	actionFuncMap[utils.MetaSyPublish] = syPublish
 }
 
 func getActionFunc(typ string) (f actionTypeFunc, exists bool) {
@@ -1386,16 +1372,14 @@ func resetAccountCDR(ub *Account, action *Action, _ Actions, fltrS *FilterS, _ a
 		if bsum == nil {
 			continue
 		}
-		if err := ub.setBalanceAction(&Action{
-			Balance: &BalanceFilter{
-				Uuid:     &bsum.UUID,
-				ID:       &bsum.ID,
-				Type:     &bsum.Type,
-				Value:    &utils.ValueFormula{Static: bsum.Value},
-				Weight:   &bsum.Weight,
-				Disabled: &bsum.Disabled,
-				Factors:  &bsum.Factors,
-			},
+		if err := ub.restoreFromBalanceSummary(&BalanceFilter{
+			Uuid:     &bsum.UUID,
+			ID:       &bsum.ID,
+			Type:     &bsum.Type,
+			Value:    &utils.ValueFormula{Static: bsum.Value},
+			Weight:   &bsum.Weight,
+			Disabled: &bsum.Disabled,
+			Factors:  &bsum.Factors,
 		}, fltrS); err != nil {
 			utils.Logger.Warning(fmt.Sprintf("<%s> Error %s setting balance %s for account: %s", utils.Actions, err, bsum.UUID, account))
 		}
@@ -3073,4 +3057,26 @@ func dynamicActionTrigger(_ *Account, act *Action, _ Actions, _ *FilterS, ev any
 	// create the ActionTrigger based on the populated parameters
 	var reply string
 	return connMgr.Call(context.Background(), connCfg.ConnIDs, utils.APIerSv1SetActionTrigger, at, &reply)
+}
+
+// holds the threshold client and syConnIDs
+type thresholdSyConn struct {
+	syConnIDs       *utils.SyConnIDs
+	thresholdClient *utils.BiJClient
+}
+
+// syPublish is used for diameter Sy sessions, to send SNR from thresholds to sessions to diameter agent
+func syPublish(ub *Account, _ *Action, _ Actions, _ *FilterS, extraData any, _ SharedActionsData, _ ActionConnCfg) (err error) {
+	thresholdSyConn, canCast := extraData.(*thresholdSyConn)
+	if !canCast {
+		return fmt.Errorf("Couldn't cast <extraData> of type <%T> to <thresholdSyConn>", extraData)
+	}
+	var rply string
+	if err = thresholdSyConn.thresholdClient.Conn().Call(context.TODO(), utils.SessionSv1ThresholdNotify,
+		thresholdSyConn.syConnIDs.CGRID, &rply); err != nil {
+		utils.Logger.Warning(
+			fmt.Sprintf(
+				"<ThresholdS> Call to SessionSv1.ThresholdNotify failed with error <%s>", err))
+	}
+	return
 }
